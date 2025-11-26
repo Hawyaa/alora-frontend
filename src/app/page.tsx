@@ -1,9 +1,12 @@
-"use client"
+'use client'
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { ChevronLeft, ChevronRight, Star, ShoppingBag, Instagram, Facebook, Twitter } from "lucide-react"
+import { ChevronLeft, ChevronRight, Star, ShoppingBag } from "lucide-react"
+import { useCart } from '@/contexts/CartContext'
+import { useAuth } from '@/contexts/AuthContext'
+import { useRouter } from 'next/navigation'
 
 const circleImages = [
   {
@@ -59,64 +62,6 @@ const circleImages = [
     desc: "Fresh coral tone",
     price: "$21.99",
     rating: 4.4
-  }
-]
-
-// New images for the product grid section
-const productGridImages = [
-  {
-    id: 1,
-    src: "https://i.pinimg.com/1200x/fe/1c/9c/fe1c9c1c9ee715f9459d5a10685df040.jpg",
-    alt: "Glossy Pink Shine",
-    name: "Pink Shimmer",
-    desc: "Luminous pink glow",
-    price: "$24.99",
-    rating: 4.7
-  },
-  {
-    id: 2,
-    src: "https://i.pinimg.com/736x/c6/50/35/c650357f10248f78709e2a1b0895ae24.jpg",
-    alt: "Berry Gloss",
-    name: "Berry Glow",
-    desc: "Rich berry tint",
-    price: "$22.99",
-    rating: 4.8
-  },
-  {
-    id: 3,
-    src: "https://i.pinimg.com/736x/39/4d/db/394ddb3a96c5c3167e2295cb21d32ce5.jpg",
-    alt: "Nude Perfection",
-    name: "Nude Perfection",
-    desc: "Natural nude finish",
-    price: "$26.99",
-    rating: 4.6
-  },
-  {
-    id: 4,
-    src: "https://i.pinimg.com/1200x/84/d3/61/84d3615619c9e2f29a669bf25b5dc61a.jpg",
-    alt: "Coral Bliss",
-    name: "Coral Kiss",
-    desc: "Fresh coral shine",
-    price: "$23.99",
-    rating: 4.5
-  },
-  {
-    id: 5,
-    src: "https://i.pinimg.com/1200x/16/b4/67/16b4673e852897e145de5618fb33973d.jpg",
-    alt: "Ruby Red",
-    name: "Ruby Red",
-    desc: "Bold red gloss",
-    price: "$25.99",
-    rating: 4.9
-  },
-  {
-    id: 6,
-    src: "https://i.pinimg.com/1200x/f5/1f/e0/f51fe0ead4c9a90323b23adb5da4944c.jpg",
-    alt: "Magenta Dream",
-    name: "Magenta Magic",
-    desc: "Vibrant magenta",
-    price: "$24.99",
-    rating: 4.7
   }
 ]
 
@@ -360,13 +305,67 @@ function HeroCarousel() {
   )
 }
 
-// Footer Component
-
 export default function Home() {
-  const [cartItems, setCartItems] = useState<number[]>([])
+  const { addToCart } = useCart()
+  const { isAuthenticated } = useAuth()
+  const router = useRouter()
+  const [addingProductId, setAddingProductId] = useState<string | null>(null)
+  const [realProducts, setRealProducts] = useState<any[]>([])
+  const [productsLoading, setProductsLoading] = useState(true)
 
-  const addToCart = (productId: number) => {
-    setCartItems(prev => [...prev, productId])
+  // Fetch real products from backend
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`)
+        const data = await response.json()
+        
+        if (data.success && data.products.length > 0) {
+          setRealProducts(data.products)
+        } else {
+          // If no products, create samples
+          const createResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/create-sample-products`, {
+            method: 'POST'
+          })
+          const createData = await createResponse.json()
+          
+          if (createData.success) {
+            setRealProducts(createData.products)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching products:', error)
+      } finally {
+        setProductsLoading(false)
+      }
+    }
+    
+    fetchProducts()
+  }, [])
+
+  const handleAddToCart = async (productId: string) => {
+    if (!isAuthenticated) {
+      router.push('/login')
+      return
+    }
+
+    setAddingProductId(productId)
+    
+    try {
+      const result = await addToCart(productId, 1)
+      
+      if (result.success) {
+        alert('Product added to cart successfully!')
+      } else {
+        alert('Failed to add product to cart: ' + (result.error || 'Unknown error'))
+        console.error('Cart error:', result.error)
+      }
+    } catch (error: any) {
+      console.error('Add to cart error:', error)
+      alert('Error: ' + error.message)
+    }
+    
+    setAddingProductId(null)
   }
 
   const StarRating = ({ rating }: { rating: number }) => {
@@ -413,41 +412,71 @@ export default function Home() {
                 Premium Lip Gloss Collection for Every Occasion
               </h3>
               
-              <div className="grid grid-cols-3 gap-6">
-                {productGridImages.map((product) => (
-                  <div key={product.id} className="text-center group">
-                    <div className="relative h-40 rounded-lg overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 mb-3">
-                      <Image
-                        src={product.src}
-                        alt={product.name}
-                        fill
-                        className="object-cover group-hover:scale-110 transition-transform duration-300"
-                      />
+              {productsLoading ? (
+                <div className="flex justify-center items-center h-40">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
+                </div>
+              ) : realProducts.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600 mb-4">No products available</p>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/create-sample-products`, {
+                          method: 'POST'
+                        })
+                        const data = await response.json()
+                        if (data.success) {
+                          setRealProducts(data.products)
+                        }
+                      } catch (error) {
+                        console.error('Error creating products:', error)
+                      }
+                    }}
+                    className="bg-pink-500 text-white px-6 py-2 rounded-lg hover:bg-pink-600"
+                  >
+                    Create Sample Products
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-6">
+                  {realProducts.map((product) => (
+                    <div key={product._id} className="text-center group">
+                      <div className="relative h-40 rounded-lg overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 mb-3">
+                        <Image
+                          src={product.images?.[0] || "https://i.pinimg.com/1200x/fe/1c/9c/fe1c9c1c9ee715f9459d5a10685df040.jpg"}
+                          alt={product.name}
+                          fill
+                          className="object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <h4 className="font-serif font-semibold text-black text-sm">
+                          {product.name}
+                        </h4>
+                        
+                        <p className="text-gray-600 text-xs">
+                          {product.description}
+                        </p>
+                        
+                        <p className="text-lg font-bold text-black">
+                          ETB {product.price}
+                        </p>
+                        
+                        <button
+                          onClick={() => handleAddToCart(product._id)}
+                          disabled={addingProductId === product._id}
+                          className="w-full bg-gradient-to-r from-rose-400 to-pink-500 text-white py-2 px-4 rounded-full font-semibold hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <ShoppingBag size={16} className="text-white" />
+                          {addingProductId === product._id ? 'Adding...' : 'Add to Cart'}
+                        </button>
+                      </div>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <h4 className="font-serif font-semibold text-black text-sm">
-                        {product.name}
-                      </h4>
-                      
-                      <StarRating rating={product.rating} />
-                      
-                      <p className="text-lg font-bold text-black">
-                        {product.price}
-                      </p>
-                      
-                      {/* Updated Add to Cart button with pink gradient */}
-                      <button
-                        onClick={() => addToCart(product.id)}
-                        className="w-full bg-gradient-to-r from-rose-400 to-pink-500 text-white py-2 px-4 rounded-full font-semibold hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center justify-center gap-2 text-sm"
-                      >
-                        <ShoppingBag size={16} className="text-white" />
-                        Add to Cart
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -507,9 +536,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* Footer */}
-      {/* <Footer /> */}
     </div>
   )
 }

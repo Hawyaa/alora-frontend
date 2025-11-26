@@ -1,11 +1,15 @@
-"use client"
+'use client'
 
 import Link from "next/link"
 import { useState } from "react"
 import { ShoppingBag, Menu, X } from "lucide-react"
+import { useCart } from '@/contexts/CartContext'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function Navigation() {
   const [isOpen, setIsOpen] = useState(false)
+  const { cartCount } = useCart()
+  const { isAuthenticated, logout } = useAuth()
 
   return (
     <nav className="sticky top-0 z-50 backdrop-blur-md border-b border-gray-200" style={{ backgroundColor: 'rgb(249, 210, 229)' }}>
@@ -39,14 +43,38 @@ export default function Navigation() {
 
         {/* Right Section */}
         <div className="flex items-center gap-4">
+          {/* User Auth Status */}
+          <div className="hidden md:flex items-center gap-4">
+            {isAuthenticated ? (
+              <button 
+                onClick={logout}
+                className="text-sm font-medium text-black hover:text-gray-700 transition-colors"
+              >
+                Logout
+              </button>
+            ) : (
+              <>
+                <Link href="/login" className="text-sm font-medium text-black hover:text-gray-700 transition-colors">
+                  Login
+                </Link>
+                <Link href="/register" className="text-sm font-medium text-black hover:text-gray-700 transition-colors">
+                  Register
+                </Link>
+              </>
+            )}
+          </div>
+
+          {/* Cart Icon */}
           <Link href="/cart" className="relative p-2 hover:bg-black/10 rounded-lg transition-colors">
             <ShoppingBag size={20} className="text-black" />
-            <span 
-              className="absolute top-1 right-1 w-4 h-4 text-white text-xs rounded-full flex items-center justify-center"
-              style={{ backgroundColor: 'rgb(255, 112, 183)' }}
-            >
-              0
-            </span>
+            {cartCount > 0 && (
+              <span 
+                className="absolute top-1 right-1 w-4 h-4 text-white text-xs rounded-full flex items-center justify-center"
+                style={{ backgroundColor: 'rgb(255, 112, 183)' }}
+              >
+                {cartCount}
+              </span>
+            )}
           </Link>
 
           {/* Mobile Menu Button */}
@@ -91,6 +119,38 @@ export default function Navigation() {
             >
               Contact
             </Link>
+            
+            {/* Mobile Auth Links */}
+            <div className="border-t border-gray-300 pt-4">
+              {isAuthenticated ? (
+                <button 
+                  onClick={() => {
+                    logout();
+                    setIsOpen(false);
+                  }}
+                  className="text-sm font-medium text-black hover:text-gray-700 py-2 transition-colors px-4 rounded-lg hover:bg-black/10 w-full text-left"
+                >
+                  Logout
+                </button>
+              ) : (
+                <>
+                  <Link 
+                    href="/login" 
+                    className="text-sm font-medium text-black hover:text-gray-700 py-2 transition-colors px-4 rounded-lg hover:bg-black/10 block"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Login
+                  </Link>
+                  <Link 
+                    href="/register" 
+                    className="text-sm font-medium text-black hover:text-gray-700 py-2 transition-colors px-4 rounded-lg hover:bg-black/10 block"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Register
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
