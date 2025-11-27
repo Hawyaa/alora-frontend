@@ -44,19 +44,19 @@ function Footer() {
 export default function About() {
   return (
     <div className="min-h-screen bg-[rgb(249,210,229)]">
-      {/* Hero */}
-      <div className="bg-gradient-to-b from-[rgb(249,210,229)] to-[rgb(249,210,229)] py-16">
+      {/* Hero - Reduced spacing */}
+      <div className="bg-gradient-to-b from-[rgb(249,210,229)] to-[rgb(249,210,229)] py-8">
         <div className="container-custom text-center">
           <h1 className="text-5xl md:text-6xl font-serif font-bold text-gray-900 mb-4">About Luminous</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">Crafting premium lip gloss with passion and purpose</p>
         </div>
       </div>
 
-      {/* Story */}
-      <div className="container-custom py-20">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center mb-20">
+      {/* Story - Reduced spacing */}
+      <div className="container-custom py-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center mb-12">
           <div>
-            <h2 className="text-4xl font-serif font-bold text-gray-900 mb-6">Our Story</h2>
+            <h2 className="text-4xl font-serif font-bold text-gray-900 mb-4">Our Story</h2>
             <p className="text-gray-600 mb-4 leading-relaxed">
               Luminous was founded with a simple mission: to create beauty products that make you feel confident,
               radiant, and beautiful.
@@ -66,7 +66,7 @@ export default function About() {
               standards.
             </p>
           </div>
-          <div className="relative h-96 rounded-lg overflow-hidden">
+          <div className="relative h-80 rounded-lg overflow-hidden">
             <Image 
               src="https://i.pinimg.com/1200x/66/85/54/66855474f149bbf745f128b890104834.jpg" 
               alt="Our Story" 
@@ -76,8 +76,8 @@ export default function About() {
           </div>
         </div>
 
-        {/* Values */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Values - Reduced spacing */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
             {
               title: "Quality",
@@ -92,14 +92,14 @@ export default function About() {
               description: "Beauty products for everyone, celebrating all skin tones",
             },
           ].map((value, idx) => (
-            <div key={idx} className="text-center bg-white p-8 rounded-lg shadow-lg">
+            <div key={idx} className="text-center bg-white p-6 rounded-lg shadow-lg">
               <h3 className="text-2xl font-serif font-bold text-gray-900 mb-3">{value.title}</h3>
               <p className="text-gray-600">{value.description}</p>
             </div>
           ))}
         </div>
       </div>
-      <Footer />
+     
     </div>
   )
 }

@@ -440,11 +440,11 @@ export default function Home() {
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-6">
-                  {realProducts.map((product) => (
+                  {realProducts.map((product, index) => (
                     <div key={product._id} className="text-center group">
                       <div className="relative h-40 rounded-lg overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 mb-3">
                         <Image
-                          src={product.images?.[0] || "https://i.pinimg.com/1200x/fe/1c/9c/fe1c9c1c9ee715f9459d5a10685df040.jpg"}
+                          src={circleImages[index]?.src || "https://i.pinimg.com/1200x/fe/1c/9c/fe1c9c1c9ee715f9459d5a10685df040.jpg"}
                           alt={product.name}
                           fill
                           className="object-cover group-hover:scale-110 transition-transform duration-300"

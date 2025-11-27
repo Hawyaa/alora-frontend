@@ -161,8 +161,8 @@ export default function Shop() {
 
   return (
     <div className="min-h-screen bg-[rgb(249,210,229)]">
-      {/* Header */}
-      <div className="bg-gradient-to-b from-[rgb(249,210,229)] to-[rgb(249,210,229)] py-16">
+      {/* Header - Reduced spacing */}
+      <div className="bg-gradient-to-b from-[rgb(249,210,229)] to-[rgb(249,210,229)] py-8">
         <div className="container-custom text-center">
           <h1 className="text-5xl md:text-6xl font-serif font-bold text-gray-900 mb-4">Shop Our Collection</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
@@ -171,8 +171,8 @@ export default function Shop() {
         </div>
       </div>
 
-      {/* Sort */}
-      <div className="container-custom py-8">
+      {/* Sort - Reduced spacing */}
+      <div className="container-custom py-4">
         <div className="flex justify-end">
           {/* Sort Dropdown */}
           <div className="flex items-center gap-2">
@@ -194,13 +194,13 @@ export default function Shop() {
         </div>
       </div>
 
-      {/* Products Grid - 4 columns */}
-      <div className="container-custom py-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+      {/* Products Grid - Reduced spacing and card height */}
+      <div className="container-custom py-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {sortedProducts.map((product) => (
             <div key={product.id} className="group bg-white rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
               <Link href={`/product/${product.id}`}>
-                <div className="relative overflow-hidden bg-gray-100 h-80">
+                <div className="relative overflow-hidden bg-gray-100 h-64">
                   <Image
                     src={product.image || "/placeholder.svg"}
                     alt={product.name}
@@ -215,7 +215,7 @@ export default function Shop() {
                 </div>
               </Link>
 
-              <div className="p-6 space-y-3">
+              <div className="p-4 space-y-2">
                 <h3 className="text-lg font-serif font-semibold text-gray-900 group-hover:text-pink-600 transition-colors">
                   {product.name}
                 </h3>
@@ -235,7 +235,7 @@ export default function Shop() {
 
                 <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
 
-                <div className="flex items-center justify-between pt-4">
+                <div className="flex items-center justify-between pt-2">
                   <span className="text-xl font-semibold text-gray-900">${product.price.toFixed(2)}</span>
                   <button
                     onClick={(e) => {

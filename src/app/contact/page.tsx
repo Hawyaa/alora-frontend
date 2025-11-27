@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Mail, Phone, MapPin, Send, Instagram, Facebook, Twitter } from "lucide-react"
+import { Phone, Send, Instagram, Facebook, MessageCircle } from "lucide-react"
 
 function Footer() {
   return (
@@ -27,7 +27,7 @@ function Footer() {
               <Facebook size={20} className="text-black" />
             </a>
             <a href="#" className="p-2 bg-white/80 rounded-full hover:bg-white transition-colors shadow-sm">
-              <Twitter size={20} className="text-black" />
+              <MessageCircle size={20} className="text-black" />
             </a>
           </div>
 
@@ -46,8 +46,7 @@ function Footer() {
 export default function Contact() {
   const [formData, setFormData] = useState({
     name: "",
-    email: "",
-    subject: "",
+    phone: "",
     message: ""
   })
 
@@ -62,79 +61,59 @@ export default function Contact() {
     e.preventDefault()
     // Handle form submission here
     console.log("Form submitted:", formData)
-    alert("Thank you for your message! We'll get back to you soon.")
-    setFormData({ name: "", email: "", subject: "", message: "" })
+    alert("Thank you for your message! We'll contact you soon.")
+    setFormData({ name: "", phone: "", message: "" })
   }
 
   return (
     <div className="min-h-screen bg-[rgb(249,210,229)]">
       {/* Hero */}
-      <div className="bg-gradient-to-b from-[rgb(249,210,229)] to-[rgb(249,210,229)] py-16">
+      <div className="bg-gradient-to-b from-[rgb(249,210,229)] to-[rgb(249,210,229)] py-8">
         <div className="container-custom text-center">
           <h1 className="text-5xl md:text-6xl font-serif font-bold text-gray-900 mb-4">Contact Us</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Get in touch with us - we'd love to hear from you!
+            Get in touch - we're here to help!
           </p>
         </div>
       </div>
 
       {/* Contact Section */}
-      <div className="container-custom py-20">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+      <div className="container-custom py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Contact Information */}
-          <div className="space-y-8">
+          <div className="space-y-6">
             <div>
-              <h2 className="text-4xl font-serif font-bold text-gray-900 mb-6">Let's Connect</h2>
+              <h2 className="text-4xl font-serif font-bold text-gray-900 mb-4">Let's Connect</h2>
               <p className="text-gray-600 text-lg leading-relaxed">
-                Have questions about our products? Need help with your order? 
-                We're here to help! Reach out to us and we'll get back to you as soon as possible.
+                Questions about our products? Need help with your order? 
+                Contact us directly!
               </p>
             </div>
 
             {/* Contact Methods */}
-            <div className="space-y-6">
-              <div className="flex items-start gap-4">
-                <div className="bg-white p-3 rounded-full shadow-lg">
-                  <Mail size={24} className="text-pink-500" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-1">Email Us</h3>
-                  <p className="text-gray-600">hello@aloralipgloss.com</p>
-                  <p className="text-gray-500 text-sm">We'll respond within 24 hours</p>
-                </div>
-              </div>
-
+            <div className="space-y-4">
               <div className="flex items-start gap-4">
                 <div className="bg-white p-3 rounded-full shadow-lg">
                   <Phone size={24} className="text-pink-500" />
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-1">Call Us</h3>
-                  <p className="text-gray-600">+1 (555) 123-ALORA</p>
-                  <p className="text-gray-500 text-sm">Mon-Fri from 9am to 6pm EST</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="bg-white p-3 rounded-full shadow-lg">
-                  <MapPin size={24} className="text-pink-500" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-1">Visit Us</h3>
-                  <p className="text-gray-600">123 Beauty Avenue</p>
-                  <p className="text-gray-600">Cosmetic City, CC 12345</p>
+                  <a href="tel:+1234567890" className="text-gray-600 hover:text-gray-900 text-lg">
+                    +1 (234) 567-890
+                  </a>
+                  <p className="text-gray-500 text-sm">Available 9am-6pm</p>
                 </div>
               </div>
             </div>
 
             {/* Social Media */}
             <div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Follow Us</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Follow & DM Us</h3>
               <div className="flex gap-4">
                 {[
+                  { icon: MessageCircle, href: "#", label: "TikTok" },
                   { icon: Instagram, href: "#", label: "Instagram" },
                   { icon: Facebook, href: "#", label: "Facebook" },
-                  { icon: Twitter, href: "#", label: "Twitter" },
                 ].map((social) => (
                   <a
                     key={social.label}
@@ -146,59 +125,45 @@ export default function Contact() {
                   </a>
                 ))}
               </div>
+              <p className="text-gray-600 mt-3">
+                Send us a DM - we respond quickly!
+              </p>
             </div>
           </div>
 
-          {/* Contact Form */}
-          <div className="bg-white rounded-2xl p-8 shadow-xl">
-            <h3 className="text-2xl font-serif font-bold text-gray-900 mb-6">Send us a Message</h3>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all duration-200"
-                    placeholder="Your full name"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address *
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all duration-200"
-                    placeholder="your.email@example.com"
-                  />
-                </div>
-              </div>
-
+          {/* Simple Contact Form */}
+          <div className="bg-white rounded-2xl p-6 shadow-xl">
+            <h3 className="text-2xl font-serif font-bold text-gray-900 mb-4">Quick Message</h3>
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
-                  Subject *
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                  Your Name *
                 </label>
                 <input
                   type="text"
-                  id="subject"
-                  name="subject"
-                  value={formData.subject}
+                  id="name"
+                  name="name"
+                  value={formData.name}
                   onChange={handleChange}
                   required
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all duration-200"
-                  placeholder="What's this regarding?"
+                  placeholder="Your name"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number *
+                </label>
+                <input
+                  type="tel"
+                  id="phone"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all duration-200"
+                  placeholder="Your phone number"
                 />
               </div>
 
@@ -212,15 +177,15 @@ export default function Contact() {
                   value={formData.message}
                   onChange={handleChange}
                   required
-                  rows={6}
+                  rows={4}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all duration-200 resize-none"
-                  placeholder="Tell us how we can help you..."
+                  placeholder="How can we help you?"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-pink-500 text-white py-4 px-6 rounded-lg font-semibold hover:bg-pink-600 transition-colors duration-200 flex items-center justify-center gap-2"
+                className="w-full bg-pink-500 text-white py-3 px-6 rounded-lg font-semibold hover:bg-pink-600 transition-colors duration-200 flex items-center justify-center gap-2"
               >
                 <Send size={20} />
                 Send Message
@@ -229,8 +194,6 @@ export default function Contact() {
           </div>
         </div>
       </div>
-
-      <Footer />
     </div>
   )
 }
