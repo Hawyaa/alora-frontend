@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
-  const { cartCount } = useCart();
+  const { cartCount, isLoading } = useCart(); // Get isLoading from cart
   const { isAuthenticated, logout } = useAuth();
 
   return (
@@ -84,13 +84,13 @@ export default function Navigation() {
             Alora Lipgloss
           </Link>
 
-          {/* Mobile Cart */}
+          {/* Mobile Cart - Only show badge after loading */}
           <Link
             href="/cart"
             className="relative p-2 hover:bg-black/10 rounded-lg transition-colors"
           >
             <ShoppingBag size={20} className="text-black" />
-            {cartCount > 0 && (
+            {!isLoading && cartCount > 0 && (
               <span
                 className="absolute top-1 right-1 w-4 h-4 text-white text-xs rounded-full flex items-center justify-center"
                 style={{ backgroundColor: "rgb(255, 112, 183)" }}
@@ -130,13 +130,13 @@ export default function Navigation() {
             )}
           </div>
 
-          {/* Cart Icon */}
+          {/* Cart Icon - Only show badge after loading */}
           <Link
             href="/cart"
             className="relative p-2 hover:bg-black/10 rounded-lg transition-colors"
           >
             <ShoppingBag size={20} className="text-black" />
-            {cartCount > 0 && (
+            {!isLoading && cartCount > 0 && (
               <span
                 className="absolute top-1 right-1 w-4 h-4 text-white text-xs rounded-full flex items-center justify-center"
                 style={{ backgroundColor: "rgb(255, 112, 183)" }}

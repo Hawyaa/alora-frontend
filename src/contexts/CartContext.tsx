@@ -1,252 +1,212 @@
-'use client'
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { useAuth } from './AuthContext'
+"use client"
+
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react'
+import { useAuth } from './AuthContext' // Import AuthContext
 
 interface CartItem {
-  _id: string
-  product: any
-  quantity: number
-  shade?: any
+  id: number | string
+  name: string
   price: number
+  image: string
+  quantity: number
+  category?: string
+  description?: string
+  rating?: number
+  reviews?: number
+  stock?: number
 }
 
 interface CartContextType {
   cartItems: CartItem[]
   cartCount: number
-  addToCart: (productId: string, quantity?: number, shade?: any) => Promise<{ success: boolean; data?: any; error?: string }>
-  removeFromCart: (itemId: string) => Promise<void>
-  updateQuantity: (itemId: string, quantity: number) => Promise<void>
-  clearCart: () => Promise<void>
-  fetchCart: () => Promise<void>
+  cartTotal: number
+  addToCart: (item: CartItem) => void
+  removeFromCart: (id: number | string) => void
+  updateQuantity: (id: number | string, quantity: number) => void
+  clearCart: () => void
   isLoading: boolean
-  error: string | null
+  saveCartToBackend: () => Promise<void> // Save to backend
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
-interface CartProviderProps {
-  children: ReactNode
-}
-
-export function CartProvider({ children }: CartProviderProps) {
+export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
-  const [cartCount, setCartCount] = useState(0)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const { token, isAuthenticated, user } = useAuth()
+  const [isLoading, setIsLoading] = useState(true)
+  const { isAuthenticated, user, token, clearUserCart } = useAuth()
 
-  useEffect(() => {
-    if (isAuthenticated && token) {
-      fetchCart()
-    } else {
-      setCartItems([])
-      setCartCount(0)
-      setError(isAuthenticated ? 'Authentication token missing' : null)
-    }
-  }, [isAuthenticated, token])
-
-  const fetchCart = async () => {
-    if (!isAuthenticated || !token) {
-      console.error('Cannot fetch cart: not authenticated or token missing')
-      setError('Please login to view cart')
-      return
+  // Generate unique cart key based on user ID or guest session
+  const getCartKey = () => {
+    if (typeof window === 'undefined') return 'alora-cart-guest'
+    
+    if (isAuthenticated && user?.id) {
+      return `alora-cart-user-${user.id}`
     }
     
-    setIsLoading(true)
-    setError(null)
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-      const response = await fetch(`${apiUrl}/cart`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-      
-      if (response.status === 401) {
-        throw new Error('Authentication failed - please login again')
-      }
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch cart: ${response.status}`)
-      }
-      
-      const data = await response.json()
-      
-      if (data.success) {
-        setCartItems(data.cart?.items || [])
-        setCartCount(data.cart?.items?.length || 0)
-      } else {
-        throw new Error(data.message || 'Failed to fetch cart data')
-      }
-    } catch (error: any) {
-      console.error('Error fetching cart:', error)
-      setError(error.message)
-    } finally {
-      setIsLoading(false)
+    // For guests, use session storage or create guest ID
+    let guestId = localStorage.getItem('alora-guest-id')
+    if (!guestId) {
+      guestId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      localStorage.setItem('alora-guest-id', guestId)
     }
+    return `alora-cart-${guestId}`
   }
 
-  const addToCart = async (productId: string, quantity: number = 1, shade: any = null) => {
-    if (!isAuthenticated || !token) {
-      return { success: false, error: 'Please login to add items to cart' }
+  // Initialize cart - check for user-specific cart
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cartKey = getCartKey()
+        const savedCart = localStorage.getItem(cartKey)
+        
+        if (savedCart) {
+          setCartItems(JSON.parse(savedCart))
+        } else {
+          // If no saved cart for this user, clear any old cart data
+          localStorage.removeItem('alora-cart') // Remove old global cart
+          setCartItems([])
+        }
+      } catch (error) {
+        console.error('Error loading cart:', error)
+        setCartItems([])
+      } finally {
+        setIsLoading(false)
+      }
     }
+  }, [isAuthenticated, user?.id]) // Re-run when auth state changes
 
-    setError(null)
+  // Save cart to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !isLoading) {
+      try {
+        const cartKey = getCartKey()
+        localStorage.setItem(cartKey, JSON.stringify(cartItems))
+        
+        // Also save to backend if user is authenticated
+        if (isAuthenticated && token) {
+          saveCartToBackend()
+        }
+      } catch (error) {
+        console.error('Error saving cart:', error)
+      }
+    }
+  }, [cartItems, isLoading, isAuthenticated])
+
+  // Save cart to backend API
+  const saveCartToBackend = async () => {
+    if (!isAuthenticated || !token) return
+    
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-      const response = await fetch(`${apiUrl}/cart/add`, {
+      await fetch('http://localhost:5000/api/cart/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          productId,
-          quantity,
-          shade,
-        }),
+        body: JSON.stringify({ items: cartItems })
       })
+    } catch (error) {
+      console.error('Error saving cart to backend:', error)
+    }
+  }
 
-      if (response.status === 401) {
-        throw new Error('Authentication failed - please login again')
+  // Load cart from backend when user logs in
+  useEffect(() => {
+    const loadFromBackend = async () => {
+      if (isAuthenticated && token && !isLoading) {
+        try {
+          const response = await fetch('http://localhost:5000/api/cart', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+          
+          if (response.ok) {
+            const data = await response.json()
+            if (data.items && data.items.length > 0) {
+              // Merge backend cart with local cart
+              setCartItems(prev => {
+                const merged = [...prev]
+                data.items.forEach((backendItem: CartItem) => {
+                  const existingIndex = merged.findIndex(item => item.id === backendItem.id)
+                  if (existingIndex >= 0) {
+                    // Item exists, update quantity
+                    merged[existingIndex].quantity += backendItem.quantity
+                  } else {
+                    // New item, add it
+                    merged.push(backendItem)
+                  }
+                })
+                return merged
+              })
+            }
+          }
+        } catch (error) {
+          console.error('Error loading cart from backend:', error)
+        }
       }
+    }
+    
+    loadFromBackend()
+  }, [isAuthenticated, token, isLoading])
 
-      if (!response.ok) {
-        throw new Error(`Failed to add item: ${response.status}`)
-      }
+  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
+  const cartTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
 
-      const data = await response.json()
-
-      if (data.success) {
-        setCartItems(data.cart?.items || [])
-        setCartCount(data.cart?.items?.length || 0)
-        return { success: true, data }
+  const addToCart = (item: CartItem) => {
+    setCartItems(prev => {
+      const existingItem = prev.find(i => i.id === item.id)
+      if (existingItem) {
+        return prev.map(i => 
+          i.id === item.id 
+            ? { ...i, quantity: i.quantity + 1 }
+            : i
+        )
       } else {
-        throw new Error(data.message || 'Failed to add item to cart')
+        return [...prev, { ...item, quantity: 1 }]
       }
-    } catch (error: any) {
-      console.error('Error adding to cart:', error)
-      setError(error.message)
-      return { success: false, error: error.message }
+    })
+  }
+
+  const removeFromCart = (id: number | string) => {
+    setCartItems(prev => prev.filter(item => item.id !== id))
+  }
+
+  const updateQuantity = (id: number | string, quantity: number) => {
+    if (quantity <= 0) {
+      removeFromCart(id)
+    } else {
+      setCartItems(prev => 
+        prev.map(item => 
+          item.id === id ? { ...item, quantity } : item
+        )
+      )
     }
   }
 
-  const removeFromCart = async (itemId: string) => {
-    if (!isAuthenticated || !token) {
-      setError('Please login to modify cart')
-      return
-    }
-
-    setError(null)
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-      const response = await fetch(`${apiUrl}/cart/remove`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ itemId }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to remove item from cart')
-      }
-
-      const data = await response.json()
-
-      if (data.success) {
-        setCartItems(data.cart?.items || [])
-        setCartCount(data.cart?.items?.length || 0)
-      }
-    } catch (error: any) {
-      console.error('Error removing from cart:', error)
-      setError(error.message)
+  const clearCart = () => {
+    setCartItems([])
+    if (typeof window !== 'undefined') {
+      const cartKey = getCartKey()
+      localStorage.removeItem(cartKey)
     }
   }
 
-  const updateQuantity = async (itemId: string, quantity: number) => {
-    if (!isAuthenticated || !token) {
-      setError('Please login to modify cart')
-      return
-    }
-
-    if (quantity < 1) {
-      await removeFromCart(itemId)
-      return
-    }
-
-    setError(null)
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-      const response = await fetch(`${apiUrl}/cart/update`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ itemId, quantity }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to update cart')
-      }
-
-      const data = await response.json()
-
-      if (data.success) {
-        setCartItems(data.cart?.items || [])
-        setCartCount(data.cart?.items?.length || 0)
-      }
-    } catch (error: any) {
-      console.error('Error updating quantity:', error)
-      setError(error.message)
-    }
-  }
-
-  const clearCart = async () => {
-    if (!isAuthenticated || !token) return
-
-    setError(null)
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-      const response = await fetch(`${apiUrl}/cart/clear`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to clear cart')
-      }
-
-      const data = await response.json()
-
-      if (data.success) {
-        setCartItems([])
-        setCartCount(0)
-      }
-    } catch (error: any) {
-      console.error('Error clearing cart:', error)
-      setError(error.message)
-    }
-  }
-
-  const value: CartContextType = {
-    cartItems,
-    cartCount,
-    addToCart,
-    removeFromCart,
-    updateQuantity,
-    clearCart,
-    fetchCart,
-    isLoading,
-    error,
-  }
-
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>
+  return (
+    <CartContext.Provider value={{
+      cartItems,
+      cartCount,
+      cartTotal,
+      addToCart,
+      removeFromCart,
+      updateQuantity,
+      clearCart,
+      isLoading,
+      saveCartToBackend
+    }}>
+      {children}
+    </CartContext.Provider>
+  )
 }
 
 export function useCart() {

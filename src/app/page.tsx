@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Star, ShoppingBag } from "lucide-react"
 import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
+import { api } from '@/lib/api' // Import your API client
 
 const circleImages = [
   {
@@ -313,28 +314,43 @@ export default function Home() {
   const [realProducts, setRealProducts] = useState<any[]>([])
   const [productsLoading, setProductsLoading] = useState(true)
 
-  // Fetch real products from backend
+  // Fetch real products from backend - USING YOUR API CLIENT
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`)
-        const data = await response.json()
+        console.log('Fetching products from API...')
         
-        if (data.success && data.products.length > 0) {
+        // Use your API client instead of direct fetch
+        const data = await api.get('/products')
+        console.log('Products API response:', data)
+        
+        if (data.success && data.products && data.products.length > 0) {
           setRealProducts(data.products)
         } else {
-          // If no products, create samples
-          const createResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/create-sample-products`, {
-            method: 'POST'
-          })
-          const createData = await createResponse.json()
-          
-          if (createData.success) {
-            setRealProducts(createData.products)
-          }
+          // If no products, use the circleImages as fallback
+          console.log('No products from API, using fallback data')
+          const fallbackProducts = circleImages.map(img => ({
+            _id: img.id.toString(),
+            name: img.name,
+            description: img.desc,
+            price: parseFloat(img.price.replace('$', '')),
+            rating: img.rating,
+            image: img.src
+          }))
+          setRealProducts(fallbackProducts)
         }
       } catch (error) {
         console.error('Error fetching products:', error)
+        // Use fallback data on error
+        const fallbackProducts = circleImages.map(img => ({
+          _id: img.id.toString(),
+          name: img.name,
+          description: img.desc,
+          price: parseFloat(img.price.replace('$', '')),
+          rating: img.rating,
+          image: img.src
+        }))
+        setRealProducts(fallbackProducts)
       } finally {
         setProductsLoading(false)
       }
@@ -343,29 +359,33 @@ export default function Home() {
     fetchProducts()
   }, [])
 
-  const handleAddToCart = async (productId: string) => {
+  const handleAddToCart = (product: any) => {
     if (!isAuthenticated) {
       router.push('/login')
       return
     }
 
-    setAddingProductId(productId)
+    setAddingProductId(product._id)
     
     try {
-      const result = await addToCart(productId, 1)
+      // Use the addToCart function from your CartContext
+      addToCart({
+        id: product._id || product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image || product.src,
+        quantity: 1,
+        description: product.description || product.desc,
+        rating: product.rating
+      })
       
-      if (result.success) {
-        alert('Product added to cart successfully!')
-      } else {
-        alert('Failed to add product to cart: ' + (result.error || 'Unknown error'))
-        console.error('Cart error:', result.error)
-      }
+      alert(`✅ ${product.name} added to cart!`)
     } catch (error: any) {
       console.error('Add to cart error:', error)
       alert('Error: ' + error.message)
+    } finally {
+      setAddingProductId(null)
     }
-    
-    setAddingProductId(null)
   }
 
   const StarRating = ({ rating }: { rating: number }) => {
@@ -375,7 +395,7 @@ export default function Home() {
           <Star
             key={star}
             size={14}
-            className={star <= rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
+            className={star <= Math.floor(rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
           />
         ))}
         <span className="text-xs text-gray-500 ml-1">({rating})</span>
@@ -415,61 +435,44 @@ export default function Home() {
               {productsLoading ? (
                 <div className="flex justify-center items-center h-40">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
-                </div>
-              ) : realProducts.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-600 mb-4">No products available</p>
-                  <button
-                    onClick={async () => {
-                      try {
-                        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/create-sample-products`, {
-                          method: 'POST'
-                        })
-                        const data = await response.json()
-                        if (data.success) {
-                          setRealProducts(data.products)
-                        }
-                      } catch (error) {
-                        console.error('Error creating products:', error)
-                      }
-                    }}
-                    className="bg-pink-500 text-white px-6 py-2 rounded-lg hover:bg-pink-600"
-                  >
-                    Create Sample Products
-                  </button>
+                  <span className="ml-3 text-gray-600">Loading products...</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                   {realProducts.map((product, index) => (
-                    <div key={product._id} className="text-center group">
-                      <div className="relative h-40 rounded-lg overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 mb-3">
+                    <div key={product._id || product.id} className="text-center group">
+                      <div className="relative h-48 rounded-lg overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 mb-3">
                         <Image
-                          src={circleImages[index]?.src || "https://i.pinimg.com/1200x/fe/1c/9c/fe1c9c1c9ee715f9459d5a10685df040.jpg"}
+                          src={product.image || circleImages[index % circleImages.length]?.src}
                           alt={product.name}
                           fill
                           className="object-cover group-hover:scale-110 transition-transform duration-300"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         />
                       </div>
                       
-                      <div className="space-y-2">
-                        <h4 className="font-serif font-semibold text-black text-sm">
+                      <div className="space-y-2 p-2">
+                        <h4 className="font-serif font-semibold text-black text-base">
                           {product.name}
                         </h4>
                         
-                        <p className="text-gray-600 text-xs">
+                        <p className="text-gray-600 text-sm line-clamp-2">
                           {product.description}
                         </p>
                         
-                        <p className="text-lg font-bold text-black">
-                          ETB {product.price}
-                        </p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-lg font-bold text-black">
+                            ${product.price?.toFixed(2) || '24.99'}
+                          </p>
+                          <StarRating rating={product.rating || 4.5} />
+                        </div>
                         
                         <button
-                          onClick={() => handleAddToCart(product._id)}
+                          onClick={() => handleAddToCart(product)}
                           disabled={addingProductId === product._id}
                           className="w-full bg-gradient-to-r from-rose-400 to-pink-500 text-white py-2 px-4 rounded-full font-semibold hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <ShoppingBag size={16} className="text-white" />
+                          <ShoppingBag size={16} />
                           {addingProductId === product._id ? 'Adding...' : 'Add to Cart'}
                         </button>
                       </div>

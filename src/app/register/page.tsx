@@ -29,16 +29,28 @@ export default function RegisterPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-
-    const result = await register(formData)
-    
-    if (result.success) {
-      router.push('/')
-    } else {
-      setError(result.error || 'Registration failed')
+  
+    try {
+      // Call the register function
+      const result = await register(formData)
+      
+      console.log('Registration result:', result)
+      
+      if (result.success) {
+        // Registration successful - redirect to home
+        alert('Registration successful! You are now logged in.')
+        router.push('/')
+      } else {
+        // Show error from backend
+        setError(result.error || 'Registration failed')
+      }
+    } catch (error: any) {
+      // Handle unexpected errors
+      console.error('Registration catch error:', error)
+      setError(error.message || 'An unexpected error occurred')
+    } finally {
+      setLoading(false)
     }
-    
-    setLoading(false)
   }
 
   return (

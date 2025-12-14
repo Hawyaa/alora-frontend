@@ -2,82 +2,68 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ShoppingBag, Trash2, Plus, Minus, ArrowLeft, CreditCard } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
 import { useCart } from '@/contexts/CartContext'
-import { usePayment } from '@/contexts/PaymentContext'
+import Image from 'next/image'
+import Link from 'next/link'
 
 export default function CartPage() {
   const [isLoading, setIsLoading] = useState(false)
+  const [hasToken, setHasToken] = useState(false)
   const router = useRouter()
-  const { isAuthenticated, user, token } = useAuth()
-  const { cartItems, clearCart, updateQuantity, removeFromCart } = useCart()
-  const { initializePayment } = usePayment()
+  const { cartItems, clearCart, updateQuantity, removeFromCart, cartTotal } = useCart()
 
-  // Redirect to login if not authenticated
+  // Check for token on component mount and updates
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login')
+    const checkToken = () => {
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('alora-token')
+        setHasToken(!!token)
+      }
     }
-  }, [isAuthenticated, router])
+    
+    checkToken()
+    // Listen for storage changes
+    window.addEventListener('storage', checkToken)
+    return () => window.removeEventListener('storage', checkToken)
+  }, [])
 
-  const handleQuantityChange = (itemId: string, newQuantity: number) => {
-    updateQuantity(itemId, newQuantity)
+  const handleQuantityChange = (itemId: number | string, newQuantity: number) => {
+    if (newQuantity < 1) {
+      removeFromCart(itemId)
+    } else {
+      updateQuantity(itemId, newQuantity)
+    }
   }
 
-  const handleRemoveItem = (itemId: string) => {
-    removeFromCart(itemId)
-  }
-
-  const calculateTotal = () => {
-    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0)
+  const handleRemoveItem = (itemId: number | string) => {
+    if (confirm('Are you sure you want to remove this item?')) {
+      removeFromCart(itemId)
+    }
   }
 
   const handleCheckout = async () => {
     setIsLoading(true)
     try {
       // Calculate total amount
-      const subtotal = calculateTotal()
       const shipping = 5
-      const tax = subtotal * 0.08
-      const totalAmount = Math.ceil(subtotal + shipping + tax) // Round up
+      const tax = cartTotal * 0.08
+      const totalAmount = Math.ceil(cartTotal + shipping + tax)
       
       console.log('Starting payment for amount:', totalAmount)
-
-      // Store cart items before payment
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-        await fetch(`${apiUrl}/payment/store-cart`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ cartItems })
-        });
-      } catch (error) {
-        console.log('Cart storage failed, continuing...');
-      }
-
-      // Initialize payment with Chapa
-      const result = await initializePayment(
-        totalAmount,
-        user?.email || 'customer@example.com',
-        {
-          firstName: user?.name?.split(' ')[0] || 'Customer',
-          lastName: user?.name?.split(' ')[1] || '',
-          phone: user?.phone || ''
+      
+      // Check if user is logged in for checkout
+      if (!hasToken) {
+        // Redirect to login with checkout intent
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('checkout-intent', 'true')
         }
-      )
-
-      console.log('Payment result:', result)
-
-      if (result.success && result.data?.checkout_url) {
-        // Redirect to Chapa payment page
-        console.log('Redirecting to Chapa...')
-        window.location.href = result.data.checkout_url
-      } else {
-        alert('Payment failed: ' + (result.error || 'Please try again.'))
+        router.push('/login')
+        return
       }
+      
+      // Proceed with checkout logic here
+      router.push('/payment') // Or your checkout page
+      
     } catch (error) {
       console.error('Checkout error:', error)
       alert('Checkout failed. Please try again.')
@@ -86,16 +72,10 @@ export default function CartPage() {
     }
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
-          <p>Redirecting to login...</p>
-        </div>
-      </div>
-    )
-  }
+  // Calculate order summary
+  const shipping = 5
+  const tax = cartTotal * 0.08
+  const total = cartTotal + shipping + tax
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -111,7 +91,12 @@ export default function CartPage() {
               Back
             </button>
             <h1 className="text-2xl font-bold text-gray-900">Shopping Cart</h1>
-            <div className="w-6"></div>
+            <div className="flex items-center gap-2">
+              <ShoppingBag size={20} />
+              <span className="bg-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                {cartItems.length}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -123,12 +108,12 @@ export default function CartPage() {
             <ShoppingBag size={64} className="mx-auto text-gray-400 mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h2>
             <p className="text-gray-600 mb-6">Add some products to get started!</p>
-            <button
-              onClick={() => router.push('/')}
-              className="bg-pink-500 text-white px-6 py-3 rounded-lg hover:bg-pink-600 transition-colors"
+            <Link
+              href="/shop"
+              className="bg-gradient-to-r from-rose-400 to-pink-500 text-white px-6 py-3 rounded-lg hover:from-rose-500 hover:to-pink-600 transition-all duration-300 inline-block"
             >
               Continue Shopping
-            </button>
+            </Link>
           </div>
         ) : (
           // Cart with items
@@ -144,41 +129,43 @@ export default function CartPage() {
                 
                 <div className="divide-y">
                   {cartItems.map((item) => (
-                    <div key={item._id} className="p-6 flex items-center space-x-4">
+                    <div key={item.id} className="p-6 flex items-center space-x-4">
                       {/* Product image */}
-                      <div className="flex-shrink-0 w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center">
-                        <ShoppingBag size={24} className="text-gray-400" />
+                      <div className="relative flex-shrink-0 w-20 h-20 bg-gray-100 rounded-lg overflow-hidden">
+                        <Image
+                          src={item.image || "/placeholder.svg"}
+                          alt={item.name}
+                          fill
+                          className="object-cover"
+                          sizes="80px"
+                        />
                       </div>
 
                       {/* Product details */}
                       <div className="flex-1 min-w-0">
                         <h3 className="text-lg font-medium text-gray-900 truncate">
-                          {item.product?.name || 'Product'}
+                          {item.name}
                         </h3>
-                        <p className="text-gray-600">${item.price.toFixed(2)}</p>
-                        {item.shade && (
-                          <div className="flex items-center mt-1">
-                            <span className="text-sm text-gray-500">Shade: </span>
-                            <div
-                              className="w-4 h-4 rounded-full ml-2 border border-gray-300"
-                              style={{ backgroundColor: item.shade.hexCode || '#ccc' }}
-                            ></div>
-                            <span className="text-sm ml-1">{item.shade.name || 'Default'}</span>
-                          </div>
+                        <p className="text-gray-600">${item.price.toFixed(2)} each</p>
+                        {item.category && (
+                          <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded mt-1">
+                            {item.category}
+                          </span>
                         )}
                       </div>
 
                       {/* Quantity controls */}
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => handleQuantityChange(item._id, item.quantity - 1)}
+                          onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
                           className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50"
+                          disabled={item.quantity <= 1}
                         >
                           <Minus size={16} />
                         </button>
-                        <span className="w-8 text-center">{item.quantity}</span>
+                        <span className="w-8 text-center font-medium">{item.quantity}</span>
                         <button
-                          onClick={() => handleQuantityChange(item._id, item.quantity + 1)}
+                          onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
                           className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50"
                         >
                           <Plus size={16} />
@@ -191,10 +178,12 @@ export default function CartPage() {
                           ${(item.price * item.quantity).toFixed(2)}
                         </p>
                         <button
-                          onClick={() => handleRemoveItem(item._id)}
-                          className="text-red-500 hover:text-red-700 mt-2"
+                          onClick={() => handleRemoveItem(item.id)}
+                          className="text-red-500 hover:text-red-700 mt-2 flex items-center gap-1"
+                          title="Remove item"
                         >
                           <Trash2 size={16} />
+                          <span className="text-sm">Remove</span>
                         </button>
                       </div>
                     </div>
@@ -204,7 +193,11 @@ export default function CartPage() {
                 {/* Clear cart button */}
                 <div className="p-6 border-t">
                   <button
-                    onClick={clearCart}
+                    onClick={() => {
+                      if (confirm('Are you sure you want to clear your cart?')) {
+                        clearCart()
+                      }
+                    }}
                     className="text-red-500 hover:text-red-700 flex items-center"
                   >
                     <Trash2 size={16} className="mr-2" />
@@ -220,28 +213,28 @@ export default function CartPage() {
                 <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
                 
                 <div className="space-y-3 mb-6">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between text-gray-600">
                     <span>Subtotal</span>
-                    <span>${calculateTotal().toFixed(2)}</span>
+                    <span>${cartTotal.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between text-gray-600">
                     <span>Shipping</span>
                     <span>$5.00</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Tax</span>
-                    <span>${(calculateTotal() * 0.08).toFixed(2)}</span>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Tax (8%)</span>
+                    <span>${(cartTotal * 0.08).toFixed(2)}</span>
                   </div>
-                  <div className="border-t pt-3 flex justify-between text-lg font-semibold">
+                  <div className="border-t pt-3 flex justify-between text-lg font-semibold text-gray-900">
                     <span>Total</span>
-                    <span>${(calculateTotal() + 5 + calculateTotal() * 0.08).toFixed(2)}</span>
+                    <span>${total.toFixed(2)}</span>
                   </div>
                 </div>
 
                 <button
                   onClick={handleCheckout}
-                  disabled={isLoading}
-                  className="w-full bg-pink-500 text-white py-3 px-4 rounded-lg font-semibold hover:bg-pink-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  disabled={isLoading || cartItems.length === 0}
+                  className="w-full bg-gradient-to-r from-rose-400 to-pink-500 text-white py-3 px-4 rounded-lg font-semibold hover:from-rose-500 hover:to-pink-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {isLoading ? (
                     <>
@@ -251,14 +244,23 @@ export default function CartPage() {
                   ) : (
                     <>
                       <CreditCard size={20} className="mr-2" />
-                      Proceed to Checkout
+                      {hasToken ? 'Proceed to Checkout' : 'Login to Checkout'}
                     </>
                   )}
                 </button>
 
                 <p className="text-xs text-gray-500 text-center mt-4">
-                  You will be redirected to Chapa for secure payment
+                  {!hasToken 
+                    ? "Login required for checkout" 
+                    : "Secure payment processing"}
                 </p>
+
+                <Link
+                  href="/shop"
+                  className="block text-center mt-4 text-pink-500 hover:text-pink-600 font-medium"
+                >
+                  Continue Shopping
+                </Link>
               </div>
             </div>
           </div>

@@ -1,4 +1,6 @@
-import Providers from './providers'
+import { AuthProvider } from '@/contexts/AuthContext'
+import { CartProvider } from '@/contexts/CartContext'
+import { PaymentProvider } from '@/contexts/PaymentContext'
 import Navigation from '@/components/navigation'
 import Footer from '@/components/footer'
 import './globals.css'
@@ -16,13 +18,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="flex flex-col min-h-screen">
-        <Providers>
-          <Navigation />
-          <main className="flex-grow">
-            {children}
-          </main>
-          <Footer />
-        </Providers>
+        <AuthProvider>
+          <CartProvider>
+            <PaymentProvider>
+              <Navigation />
+              <main className="flex-grow">
+                {children}
+              </main>
+              <Footer />
+            </PaymentProvider>
+          </CartProvider>
+        </AuthProvider>
       </body>
     </html>
   )

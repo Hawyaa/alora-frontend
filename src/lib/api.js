@@ -1,116 +1,70 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+// Use your existing API_URL from env or hardcode fallback
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 
-class ApiService {
-  constructor() {
-    this.baseURL = API_BASE_URL;
-  }
+// Log for debugging
+console.log('📡 API Client initialized with URL:', API_URL)
 
-  // Helper method to handle API calls
-  async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    const config = {
+export const api = {
+  async get(url, options = {}) {
+    const fullUrl = `${API_URL}${url}`
+    console.log(`🌐 GET: ${fullUrl}`)
+    
+    const response = await fetch(fullUrl, {
+      ...options,
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
       },
-      ...options,
-    };
+    })
 
-    if (config.body && typeof config.body === 'object') {
-      config.body = JSON.stringify(config.body);
-    }
-
-    try {
-      const response = await fetch(url, config);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'API request failed');
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`❌ GET Error (${response.status}) for ${fullUrl}:`, errorText)
+      
+      let errorData
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { error: errorText || `HTTP ${response.status}` }
       }
-
-      return data;
-    } catch (error) {
-      console.error('API Error:', error);
-      throw error;
+      
+      throw new Error(errorData.error || errorData.message || `API GET failed: ${response.status}`)
     }
-  }
 
-  // Auth methods
-  async register(userData) {
-    return this.request('/auth/register', {
-      method: 'POST',
-      body: userData,
-    });
-  }
-
-  async login(credentials) {
-    return this.request('/auth/login', {
-      method: 'POST',
-      body: credentials,
-    });
-  }
-
-  async getProfile(token) {
-    return this.request('/auth/profile', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-  }
-
-  // Product methods
-  async getProducts() {
-    return this.request('/products');
-  }
-
-  async createSampleProducts() {
-    return this.request('/create-sample-products', {
-      method: 'POST',
-    });
-  }
-
-  // Cart methods
-  async getCart(token) {
-    return this.request('/cart', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-  }
-
-  async addToCart(productId, quantity, shade, token) {
-    return this.request('/cart/add', {
+    return response.json()
+  },
+  
+  async post(url, data, options = {}) {
+    const fullUrl = `${API_URL}${url}`
+    console.log(`🌐 POST: ${fullUrl}`, data)
+    
+    const response = await fetch(fullUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...options.headers,
       },
-      body: {
-        productId,
-        quantity,
-        shade,
-      },
-    });
-  }
+      body: JSON.stringify(data),
+      ...options,
+    })
 
-  async clearCart(token) {
-    return this.request('/cart/clear', {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-  }
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`❌ POST Error (${response.status}) for ${fullUrl}:`, errorText)
+      
+      let errorData
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { error: errorText || `HTTP ${response.status}` }
+      }
+      
+      throw new Error(errorData.error || errorData.message || `API POST failed: ${response.status}`)
+    }
 
-  // Payment methods
-  async initializePayment(returnUrl, token) {
-    return this.request('/payments/initialize', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: { return_url: returnUrl },
-    });
+    return response.json()
   }
 }
 
-export const apiService = new ApiService();
+// Export the API_URL as well
+export { API_URL }

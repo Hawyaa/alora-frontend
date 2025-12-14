@@ -1,204 +1,194 @@
-'use client'
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+"use client"
+
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react'
 
 interface User {
-  _id: string
-  name: string
-  email: string
-  phone: string
+  id?: string
+  name?: string
+  email?: string
+  phone?: string
+  role?: string
 }
 
 interface AuthContextType {
+  isAuthenticated: boolean
   user: User | null
   token: string | null
-  loading: boolean
-  login: (email: string, password: string) => Promise<{ success: boolean; data?: any; error?: string }>
-  register: (userData: any) => Promise<{ success: boolean; data?: any; error?: string }>
+  isLoading: boolean
+  login: (email: string, password: string) => Promise<{success: boolean; user?: any; error?: string}>
   logout: () => void
-  requireAuth: (callback: () => void) => void
-  isAuthenticated: boolean
-  checkAuth: () => boolean
+  register: (userData: any) => Promise<{success: boolean; user?: any; error?: string}>
+  clearUserCart: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-interface AuthProviderProps {
-  children: ReactNode
-}
-
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check for existing auth on component mount
-    const initializeAuth = () => {
+    if (typeof window !== 'undefined') {
       try {
-        const storedToken = localStorage.getItem('auth_token')
-        const storedUser = localStorage.getItem('user')
+        const savedToken = localStorage.getItem('alora-token')
+        const savedUser = localStorage.getItem('alora-user')
         
-        console.log('AuthProvider - Initializing auth:', {
-          storedToken: storedToken ? `Present (${storedToken.substring(0, 20)}...)` : 'Missing',
-          storedUser: storedUser ? 'Present' : 'Missing'
-        })
-        
-        if (storedToken && storedUser) {
-          setToken(storedToken)
-          setUser(JSON.parse(storedUser))
+        if (savedToken && savedUser) {
+          setToken(savedToken)
+          setUser(JSON.parse(savedUser))
+          setIsAuthenticated(true)
         }
       } catch (error) {
-        console.error('Error initializing auth:', error)
-        // Clear corrupted storage
-        localStorage.removeItem('auth_token')
-        localStorage.removeItem('user')
+        console.error('Error loading auth data:', error)
       } finally {
-        setLoading(false)
+        setIsLoading(false)
       }
     }
-
-    initializeAuth()
   }, [])
-
-  const checkAuth = () => {
-    const storedToken = localStorage.getItem('auth_token')
-    const storedUser = localStorage.getItem('user')
-    return !!(storedToken && storedUser)
-  }
 
   const login = async (email: string, password: string) => {
     try {
-      // Ensure API URL is available
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-      console.log('Logging in to:', `${apiUrl}/auth/login`)
-
-      const response = await fetch(`${apiUrl}/auth/login`, {
+      console.log('Attempting login for:', email)
+      
+      const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
       })
-
+      
       const data = await response.json()
       console.log('Login response:', data)
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || 'Login failed')
+      
+      // FIXED: Don't throw error, just return it
+      if (!response.ok || !data.success) {
+        return { 
+          success: false, 
+          error: data.error || 'Login failed' 
+        }
       }
-
-      // Verify we have the token
-      if (!data.token) {
-        throw new Error('No token received from server')
-      }
-
-      // Store auth data
-      localStorage.setItem('auth_token', data.token)
-      localStorage.setItem('user', JSON.stringify({
-        _id: data.user?._id || data._id,
-        name: data.user?.name || data.name,
-        email: data.user?.email || data.email,
-        phone: data.user?.phone || data.phone,
-      }))
-
+      
+      // Clear any guest cart before setting new user
+      clearUserCart()
+      
       setToken(data.token)
-      setUser({
-        _id: data.user?._id || data._id,
-        name: data.user?.name || data.name,
-        email: data.user?.email || data.email,
-        phone: data.user?.phone || data.phone,
-      })
-
-      console.log('Login successful, token stored:', data.token.substring(0, 20) + '...')
-
-      return { success: true, data }
+      setUser(data.user)
+      setIsAuthenticated(true)
+      localStorage.setItem('alora-token', data.token)
+      localStorage.setItem('alora-user', JSON.stringify(data.user))
+      
+      // Load user's cart from backend if available
+      await loadUserCart(data.token)
+      
+      return { success: true, user: data.user }
+      
     } catch (error: any) {
       console.error('Login error:', error)
-      return { success: false, error: error.message }
+      return { 
+        success: false, 
+        error: error.message || 'Network error. Please check your connection.' 
+      }
     }
   }
 
   const register = async (userData: any) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-      console.log('Registering to:', `${apiUrl}/auth/register`)
-
-      const response = await fetch(`${apiUrl}/auth/register`, {
+      console.log('Registering user data:', userData)
+      
+      const response = await fetch('http://localhost:5000/api/auth/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
       })
-
+      
       const data = await response.json()
-      console.log('Register response:', data)
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || 'Registration failed')
+      console.log('Registration response:', data)
+      
+      // FIXED: Don't throw error, just return it
+      if (!response.ok || !data.success) {
+        return { 
+          success: false, 
+          error: data.error || 'Registration failed' 
+        }
       }
-
-      if (!data.token) {
-        throw new Error('No token received from server')
-      }
-
-      localStorage.setItem('auth_token', data.token)
-      localStorage.setItem('user', JSON.stringify({
-        _id: data.user?._id || data._id,
-        name: data.user?.name || data.name,
-        email: data.user?.email || data.email,
-        phone: data.user?.phone || data.phone,
-      }))
-
+      
+      // If registration successful, also login the user
       setToken(data.token)
-      setUser({
-        _id: data.user?._id || data._id,
-        name: data.user?.name || data.name,
-        email: data.user?.email || data.email,
-        phone: data.user?.phone || data.phone,
-      })
-
-      console.log('Registration successful, token stored:', data.token.substring(0, 20) + '...')
-
-      return { success: true, data }
+      setUser(data.user)
+      setIsAuthenticated(true)
+      localStorage.setItem('alora-token', data.token)
+      localStorage.setItem('alora-user', JSON.stringify(data.user))
+      
+      return { 
+        success: true, 
+        user: data.user,
+        token: data.token 
+      }
+      
     } catch (error: any) {
       console.error('Registration error:', error)
-      return { success: false, error: error.message }
+      return { 
+        success: false, 
+        error: 'Network error. Please check your connection.' 
+      }
     }
   }
 
   const logout = () => {
-    console.log('Logging out...')
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('user')
+    // Clear cart for this user
+    clearUserCart()
+    
     setToken(null)
     setUser(null)
-    router.push('/login')
+    setIsAuthenticated(false)
+    localStorage.removeItem('alora-token')
+    localStorage.removeItem('alora-user')
+    localStorage.removeItem('alora-cart')
   }
 
-  const requireAuth = (callback: () => void) => {
-    if (!token) {
-      router.push('/login')
-      return
+  // Load user's cart from backend
+  const loadUserCart = async (userToken: string) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/cart', {
+        headers: {
+          'Authorization': `Bearer ${userToken}`
+        }
+      })
+      
+      if (response.ok) {
+        const cartData = await response.json()
+        // Save to localStorage or context
+        if (cartData.items && cartData.items.length > 0) {
+          localStorage.setItem('alora-cart', JSON.stringify(cartData.items))
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user cart:', error)
     }
-    callback()
   }
 
-  const value: AuthContextType = {
-    user,
-    token,
-    loading,
-    login,
-    register,
-    logout,
-    requireAuth,
-    isAuthenticated: !!token,
-    checkAuth,
+  // Clear cart data for current user
+  const clearUserCart = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('alora-cart')
+    }
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{
+      isAuthenticated,
+      user,
+      token,
+      isLoading,
+      login,
+      logout,
+      register,
+      clearUserCart
+    }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {
