@@ -1,4 +1,5 @@
 'use client'
+
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ShoppingBag, Trash2, Plus, Minus, ArrowLeft, CreditCard } from 'lucide-react'
@@ -12,22 +13,16 @@ export default function CartPage() {
   const router = useRouter()
   const { cartItems, clearCart, updateQuantity, removeFromCart, cartTotal } = useCart()
 
-  // Check for token on component mount and updates
+  // Check for token on component mount
   useEffect(() => {
-    const checkToken = () => {
-      if (typeof window !== 'undefined') {
-        const token = localStorage.getItem('alora-token')
-        setHasToken(!!token)
-      }
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('alora-token')
+      setHasToken(!!token)
     }
-    
-    checkToken()
-    // Listen for storage changes
-    window.addEventListener('storage', checkToken)
-    return () => window.removeEventListener('storage', checkToken)
   }, [])
 
-  const handleQuantityChange = (itemId: number | string, newQuantity: number) => {
+  // FIXED: Use item.id instead of itemUniqueId
+  const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity < 1) {
       removeFromCart(itemId)
     } else {
@@ -35,7 +30,9 @@ export default function CartPage() {
     }
   }
 
-  const handleRemoveItem = (itemId: number | string) => {
+  // FIXED: Use item.id for removal
+  const handleRemoveItem = (itemId: string) => {
+    console.log('Remove button clicked for item ID:', itemId)
     if (confirm('Are you sure you want to remove this item?')) {
       removeFromCart(itemId)
     }
@@ -44,13 +41,6 @@ export default function CartPage() {
   const handleCheckout = async () => {
     setIsLoading(true)
     try {
-      // Calculate total amount
-      const shipping = 5
-      const tax = cartTotal * 0.08
-      const totalAmount = Math.ceil(cartTotal + shipping + tax)
-      
-      console.log('Starting payment for amount:', totalAmount)
-      
       // Check if user is logged in for checkout
       if (!hasToken) {
         // Redirect to login with checkout intent
@@ -61,8 +51,14 @@ export default function CartPage() {
         return
       }
       
-      // Proceed with checkout logic here
-      router.push('/payment') // Or your checkout page
+      // Check if cart is empty
+      if (cartItems.length === 0) {
+        alert('Your cart is empty')
+        return
+      }
+      
+      // Redirect to checkout page
+      router.push('/checkout')
       
     } catch (error) {
       console.error('Checkout error:', error)
@@ -128,8 +124,11 @@ export default function CartPage() {
                 </div>
                 
                 <div className="divide-y">
-                  {cartItems.map((item) => (
-                    <div key={item.id} className="p-6 flex items-center space-x-4">
+                  {cartItems.map((item, index) => (
+                    <div 
+                      key={`${item.id}-${index}`} 
+                      className="p-6 flex items-center space-x-4"
+                    >
                       {/* Product image */}
                       <div className="relative flex-shrink-0 w-20 h-20 bg-gray-100 rounded-lg overflow-hidden">
                         <Image
@@ -172,7 +171,7 @@ export default function CartPage() {
                         </button>
                       </div>
 
-                      {/* Price and remove */}
+                      {/* Price and remove - FIXED: Use item.id */}
                       <div className="text-right">
                         <p className="text-lg font-semibold">
                           ${(item.price * item.quantity).toFixed(2)}

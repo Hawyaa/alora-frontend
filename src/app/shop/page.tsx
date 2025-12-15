@@ -7,10 +7,13 @@ import Image from "next/image"
 import { ShoppingBag, Star, ChevronDown, LogIn } from "lucide-react"
 import { useCart } from "@/contexts/CartContext"
 import { useAuth } from "@/contexts/AuthContext"
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+
+// Updated products with string IDs that could be used as productId
 const products = [
   {
-    id: 1,
+    id: "1", // Changed to string
     name: "Rose Glow Serum",
     price: 25.99,
     rating: 4.5,
@@ -21,7 +24,7 @@ const products = [
     category: "serum",
   },
   {
-    id: 2,
+    id: "2", // Changed to string
     name: "Velvet Matte Lipstick",
     price: 15.5,
     rating: 4.2,
@@ -32,7 +35,7 @@ const products = [
     category: "matte",
   },
   {
-    id: 3,
+    id: "3", // Changed to string
     name: "Hydra Moisturizer",
     price: 19.99,
     rating: 4.7,
@@ -43,7 +46,7 @@ const products = [
     category: "moisturizer",
   },
   {
-    id: 4,
+    id: "4", // Changed to string
     name: "Glossy Pink",
     price: 22.99,
     rating: 4.8,
@@ -54,7 +57,7 @@ const products = [
     category: "gloss",
   },
   {
-    id: 5,
+    id: "5", // Changed to string
     name: "Berry Bliss",
     price: 24.99,
     rating: 4.6,
@@ -65,7 +68,7 @@ const products = [
     category: "gloss",
   },
   {
-    id: 6,
+    id: "6", // Changed to string
     name: "Nude Elegance",
     price: 20.99,
     rating: 4.4,
@@ -76,7 +79,7 @@ const products = [
     category: "gloss",
   },
   {
-    id: 7,
+    id: "7", // Changed to string
     name: "Coral Shine",
     price: 21.99,
     rating: 4.3,
@@ -87,7 +90,7 @@ const products = [
     category: "gloss",
   },
   {
-    id: 8,
+    id: "8", // Changed to string
     name: "Plumping Gloss",
     price: 26.99,
     rating: 4.7,
@@ -98,7 +101,7 @@ const products = [
     category: "gloss",
   },
   {
-    id: 9,
+    id: "9", // Changed to string
     name: "Ruby Red",
     price: 23.99,
     rating: 4.9,
@@ -109,7 +112,7 @@ const products = [
     category: "matte",
   },
   {
-    id: 10,
+    id: "10", // Changed to string
     name: "Mauve Magic",
     price: 18.99,
     rating: 4.5,
@@ -120,7 +123,7 @@ const products = [
     category: "matte",
   },
   {
-    id: 11,
+    id: "11", // Changed to string
     name: "Peach Glow",
     price: 19.99,
     rating: 4.6,
@@ -131,7 +134,7 @@ const products = [
     category: "gloss",
   },
   {
-    id: 12,
+    id: "12", // Changed to string
     name: "Night Serum",
     price: 29.99,
     rating: 4.8,
@@ -179,18 +182,16 @@ export default function Shop() {
       return
     }
     
-    // If authenticated, add to cart
+    // If authenticated, add to cart WITH productId
     addToCart({
-      id: product.id,
+      id: product.id, // Frontend ID (string)
+      productId: product.id, // Same as id for now (should be MongoDB ID in real app)
       name: product.name,
       price: product.price,
       image: product.image,
-      quantity: 1,
-      description: product.description,
       category: product.category,
-      rating: product.rating,
-      reviews: product.reviews,
-      stock: product.stock
+      // description: product.description,
+      // quantity is added by CartContext
     })
     
     // Show success message
@@ -207,7 +208,10 @@ export default function Shop() {
   const handleLoginAndAdd = () => {
     // Save product to localStorage before redirecting to login
     if (selectedProduct) {
-      localStorage.setItem('pending-cart-item', JSON.stringify(selectedProduct))
+      localStorage.setItem('pending-cart-item', JSON.stringify({
+        ...selectedProduct,
+        productId: selectedProduct.id // Ensure productId is included
+      }))
     }
     
     // Redirect to login page
@@ -220,15 +224,12 @@ export default function Shop() {
     if (selectedProduct) {
       addToCart({
         id: selectedProduct.id,
+        productId: selectedProduct.id, // Include productId
         name: selectedProduct.name,
         price: selectedProduct.price,
         image: selectedProduct.image,
-        quantity: 1,
-        description: selectedProduct.description,
         category: selectedProduct.category,
-        rating: selectedProduct.rating,
-        reviews: selectedProduct.reviews,
-        stock: selectedProduct.stock
+        // description: selectedProduct.description,
       })
       
       // Show success message
@@ -289,7 +290,7 @@ export default function Shop() {
           </p>
           {!isAuthenticated && (
             <div className="mt-6 flex justify-center gap-4">
-             
+              {/* Removed empty buttons */}
             </div>
           )}
         </div>
@@ -439,6 +440,13 @@ export default function Shop() {
               >
                 <LogIn size={18} />
                 Login & Add to Cart
+              </button>
+              
+              <button
+                onClick={handleContinueWithoutLogin}
+                className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+              >
+                Continue as Guest
               </button>
               
               <button

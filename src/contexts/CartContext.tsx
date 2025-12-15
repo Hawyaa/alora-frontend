@@ -1,218 +1,277 @@
-"use client"
+'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react'
-import { useAuth } from './AuthContext' // Import AuthContext
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-interface CartItem {
-  id: number | string
-  name: string
-  price: number
-  image: string
-  quantity: number
-  category?: string
-  description?: string
-  rating?: number
-  reviews?: number
-  stock?: number
+export interface CartItem {
+  id: string;           // Frontend ID (MongoDB product _id)
+  productId: string;    // MongoDB Product ID (same as id for consistency)
+  name: string;
+  price: number;
+  quantity: number;
+  image: string;
+  category?: string;
+  shade?: string;
+  uniqueId?: string;    // Unique ID for React keys
 }
 
 interface CartContextType {
-  cartItems: CartItem[]
-  cartCount: number
-  cartTotal: number
-  addToCart: (item: CartItem) => void
-  removeFromCart: (id: number | string) => void
-  updateQuantity: (id: number | string, quantity: number) => void
-  clearCart: () => void
-  isLoading: boolean
-  saveCartToBackend: () => Promise<void> // Save to backend
+  cartItems: CartItem[];
+  cartTotal: number;
+  addToCart: (item: Omit<CartItem, 'quantity' | 'uniqueId'>) => void;
+  updateQuantity: (itemId: string, quantity: number) => void;
+  removeFromCart: (itemId: string) => void;
+  clearCart: () => void;
+  syncCartWithBackend: () => Promise<boolean>;
+  isLoading: boolean;
 }
 
-const CartContext = createContext<CartContextType | undefined>(undefined)
+const CartContext = createContext<CartContextType | undefined>(undefined);
 
-export function CartProvider({ children }: { children: ReactNode }) {
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const { isAuthenticated, user, token, clearUserCart } = useAuth()
-
-  // Generate unique cart key based on user ID or guest session
-  const getCartKey = () => {
-    if (typeof window === 'undefined') return 'alora-cart-guest'
-    
-    if (isAuthenticated && user?.id) {
-      return `alora-cart-user-${user.id}`
-    }
-    
-    // For guests, use session storage or create guest ID
-    let guestId = localStorage.getItem('alora-guest-id')
-    if (!guestId) {
-      guestId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      localStorage.setItem('alora-guest-id', guestId)
-    }
-    return `alora-cart-${guestId}`
+export const useCart = () => {
+  const context = useContext(CartContext);
+  if (!context) {
+    throw new Error('useCart must be used within a CartProvider');
   }
+  return context;
+};
 
-  // Initialize cart - check for user-specific cart
+interface CartProviderProps {
+  children: ReactNode;
+}
+
+// Generate unique ID for cart items
+const generateUniqueId = (item: Omit<CartItem, 'quantity' | 'uniqueId'>): string => {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 9);
+  const shade = item.shade || 'default';
+  return `${item.id}-${shade}-${timestamp}-${random}`;
+};
+
+export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Load cart from localStorage on initial render
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    const savedCart = localStorage.getItem('alora-cart');
+    if (savedCart) {
       try {
-        const cartKey = getCartKey()
-        const savedCart = localStorage.getItem(cartKey)
-        
-        if (savedCart) {
-          setCartItems(JSON.parse(savedCart))
-        } else {
-          // If no saved cart for this user, clear any old cart data
-          localStorage.removeItem('alora-cart') // Remove old global cart
-          setCartItems([])
-        }
+        const parsed = JSON.parse(savedCart);
+        // Ensure each item has uniqueId, productId, and proper structure
+        const validatedItems = parsed.map((item: any) => ({
+          ...item,
+          productId: item.productId || item.id,
+          uniqueId: item.uniqueId || generateUniqueId({
+            id: item.id || item.productId,
+            productId: item.productId || item.id,
+            name: item.name,
+            price: item.price,
+            image: item.image,
+            category: item.category,
+            shade: item.shade
+          })
+        }));
+        setCartItems(validatedItems);
       } catch (error) {
-        console.error('Error loading cart:', error)
-        setCartItems([])
-      } finally {
-        setIsLoading(false)
+        console.error('Error parsing cart from localStorage:', error);
+        localStorage.removeItem('alora-cart');
       }
     }
-  }, [isAuthenticated, user?.id]) // Re-run when auth state changes
+  }, []);
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {
-    if (typeof window !== 'undefined' && !isLoading) {
-      try {
-        const cartKey = getCartKey()
-        localStorage.setItem(cartKey, JSON.stringify(cartItems))
-        
-        // Also save to backend if user is authenticated
-        if (isAuthenticated && token) {
-          saveCartToBackend()
-        }
-      } catch (error) {
-        console.error('Error saving cart:', error)
-      }
-    }
-  }, [cartItems, isLoading, isAuthenticated])
+    localStorage.setItem('alora-cart', JSON.stringify(cartItems));
+  }, [cartItems]);
 
-  // Save cart to backend API
-  const saveCartToBackend = async () => {
-    if (!isAuthenticated || !token) return
-    
+  // Calculate total
+  const cartTotal = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+
+  // Check token validity
+  const checkTokenValidity = async (token: string): Promise<boolean> => {
     try {
-      await fetch('http://localhost:5000/api/cart/save', {
+      const response = await fetch('http://localhost:5000/api/auth/verify', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data = await response.json();
+      return data.success === true;
+    } catch (error) {
+      console.error('Token verification failed:', error);
+      return false;
+    }
+  };
+
+  // Sync cart with backend
+  const syncCartWithBackend = async (): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('alora-token');
+      
+      if (!token) {
+        console.log('⚠️ No auth token, skipping backend sync');
+        return false;
+      }
+
+      // Verify token first
+      const isValid = await checkTokenValidity(token);
+      if (!isValid) {
+        console.error('❌ Invalid token, cannot sync cart');
+        return false;
+      }
+
+      if (cartItems.length === 0) {
+        console.log('🛒 Cart is empty, skipping sync');
+        return true;
+      }
+
+      console.log(`🔄 Syncing ${cartItems.length} items with backend`);
+      
+      // Prepare items for backend
+      const backendItems = cartItems.map(item => ({
+        productId: item.productId || item.id,
+        quantity: item.quantity,
+        price: item.price,
+        name: item.name,
+        shade: item.shade || 'default'
+      }));
+
+      console.log('📤 Sending to backend:', backendItems);
+
+      // Send cart items to backend
+      const response = await fetch('http://localhost:5000/api/cart/sync', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ items: cartItems })
-      })
-    } catch (error) {
-      console.error('Error saving cart to backend:', error)
-    }
-  }
+        body: JSON.stringify({ items: backendItems })
+      });
 
-  // Load cart from backend when user logs in
-  useEffect(() => {
-    const loadFromBackend = async () => {
-      if (isAuthenticated && token && !isLoading) {
-        try {
-          const response = await fetch('http://localhost:5000/api/cart', {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          })
-          
-          if (response.ok) {
-            const data = await response.json()
-            if (data.items && data.items.length > 0) {
-              // Merge backend cart with local cart
-              setCartItems(prev => {
-                const merged = [...prev]
-                data.items.forEach((backendItem: CartItem) => {
-                  const existingIndex = merged.findIndex(item => item.id === backendItem.id)
-                  if (existingIndex >= 0) {
-                    // Item exists, update quantity
-                    merged[existingIndex].quantity += backendItem.quantity
-                  } else {
-                    // New item, add it
-                    merged.push(backendItem)
-                  }
-                })
-                return merged
-              })
-            }
-          }
-        } catch (error) {
-          console.error('Error loading cart from backend:', error)
-        }
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('❌ Backend sync failed:', data);
+        return false;
       }
+
+      console.log('✅ Cart synced successfully');
+      return true;
+
+    } catch (error: any) {
+      console.error('❌ Cart sync error:', error.message);
+      return false;
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const addToCart = (item: Omit<CartItem, 'quantity' | 'uniqueId'>) => {
+    // Generate unique ID for this cart item
+    const uniqueId = generateUniqueId(item);
     
-    loadFromBackend()
-  }, [isAuthenticated, token, isLoading])
+    // Ensure productId is set
+    const itemWithIds = {
+      ...item,
+      productId: item.productId || item.id,
+      uniqueId
+    };
 
-  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
-  const cartTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-
-  const addToCart = (item: CartItem) => {
-    setCartItems(prev => {
-      const existingItem = prev.find(i => i.id === item.id)
+    setCartItems(prevItems => {
+      // Check if same product with same shade already exists
+      const existingItem = prevItems.find(i => 
+        i.productId === itemWithIds.productId && 
+        i.shade === itemWithIds.shade
+      );
+      
       if (existingItem) {
-        return prev.map(i => 
-          i.id === item.id 
-            ? { ...i, quantity: i.quantity + 1 }
+        // Update quantity of existing item
+        return prevItems.map(i =>
+          i.uniqueId === existingItem.uniqueId 
+            ? { ...i, quantity: i.quantity + 1 } 
             : i
-        )
+        );
       } else {
-        return [...prev, { ...item, quantity: 1 }]
+        // Add new item
+        return [...prevItems, { ...itemWithIds, quantity: 1 }];
       }
-    })
-  }
+    });
 
-  const removeFromCart = (id: number | string) => {
-    setCartItems(prev => prev.filter(item => item.id !== id))
-  }
-
-  const updateQuantity = (id: number | string, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(id)
-    } else {
-      setCartItems(prev => 
-        prev.map(item => 
-          item.id === id ? { ...item, quantity } : item
-        )
-      )
+    // Sync with backend if user is logged in
+    const token = localStorage.getItem('alora-token');
+    if (token) {
+      setTimeout(() => {
+        syncCartWithBackend().then(success => {
+          if (!success) {
+            console.warn('Sync failed but cart updated locally');
+          }
+        });
+      }, 500);
     }
-  }
+  };
+
+  const updateQuantity = (itemId: string, quantity: number) => {
+    setCartItems(prevItems =>
+      prevItems.map(item =>
+        item.id === itemId 
+          ? { ...item, quantity: Math.max(0, quantity) } 
+          : item
+      ).filter(item => item.quantity > 0)
+    );
+
+    // Sync with backend
+    const token = localStorage.getItem('alora-token');
+    if (token) {
+      setTimeout(() => syncCartWithBackend(), 500);
+    }
+  };
+
+  // FIXED: Use item.id instead of itemUniqueId
+  const removeFromCart = (itemId: string) => {
+    console.log('🗑️ Removing item with ID:', itemId);
+    console.log('Current cart items before removal:', cartItems);
+    
+    setCartItems(prevItems => {
+      const newItems = prevItems.filter(item => item.id !== itemId);
+      console.log('New cart after removal:', newItems);
+      return newItems;
+    });
+
+    // Sync with backend
+    const token = localStorage.getItem('alora-token');
+    if (token) {
+      setTimeout(() => syncCartWithBackend(), 500);
+    }
+  };
 
   const clearCart = () => {
-    setCartItems([])
-    if (typeof window !== 'undefined') {
-      const cartKey = getCartKey()
-      localStorage.removeItem(cartKey)
+    setCartItems([]);
+    localStorage.removeItem('alora-cart');
+
+    // Sync with backend
+    const token = localStorage.getItem('alora-token');
+    if (token) {
+      setTimeout(() => syncCartWithBackend(), 500);
     }
-  }
+  };
 
   return (
-    <CartContext.Provider value={{
-      cartItems,
-      cartCount,
-      cartTotal,
-      addToCart,
-      removeFromCart,
-      updateQuantity,
-      clearCart,
-      isLoading,
-      saveCartToBackend
-    }}>
+    <CartContext.Provider
+      value={{
+        cartItems,
+        cartTotal,
+        addToCart,
+        updateQuantity,
+        removeFromCart,
+        clearCart,
+        syncCartWithBackend,
+        isLoading
+      }}
+    >
       {children}
     </CartContext.Provider>
-  )
-}
-
-export function useCart() {
-  const context = useContext(CartContext)
-  if (context === undefined) {
-    throw new Error('useCart must be used within a CartProvider')
-  }
-  return context
-}
+  );
+};

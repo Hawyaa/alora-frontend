@@ -4,6 +4,7 @@ import { PaymentProvider } from '@/contexts/PaymentContext'
 import Navigation from '@/components/navigation'
 import Footer from '@/components/footer'
 import './globals.css'
+import AdminTest from '@/components/AdminTest';
 
 export const metadata = {
   title: 'Alora Lip Gloss',
@@ -29,6 +30,7 @@ export default function RootLayout({
             </PaymentProvider>
           </CartProvider>
         </AuthProvider>
+        <AdminTest />
       </body>
     </html>
   )
