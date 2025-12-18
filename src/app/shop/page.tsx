@@ -1,179 +1,106 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
-import { ShoppingBag, Star, ChevronDown, LogIn } from "lucide-react"
+import { ShoppingBag, Star, ChevronDown, LogIn, Package } from "lucide-react"
 import { useCart } from "@/contexts/CartContext"
 import { useAuth } from "@/contexts/AuthContext"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
 
-// Updated products with string IDs that could be used as productId
-const products = [
-  {
-    id: "1", // Changed to string
-    name: "Rose Glow Serum",
-    price: 25.99,
-    rating: 4.5,
-    reviews: 120,
-    stock: 10,
-    image: "https://i.pinimg.com/1200x/00/71/9b/00719b42a85d16ed14fd1f10ce865392.jpg",
-    description: "Brightens your skin and gives a healthy glow.",
-    category: "serum",
-  },
-  {
-    id: "2", // Changed to string
-    name: "Velvet Matte Lipstick",
-    price: 15.5,
-    rating: 4.2,
-    reviews: 88,
-    stock: 8,
-    image: "https://i.pinimg.com/1200x/76/5d/08/765d086b73962f060c160a355e6638bb.jpg",
-    description: "Smooth matte finish with long-lasting color.",
-    category: "matte",
-  },
-  {
-    id: "3", // Changed to string
-    name: "Hydra Moisturizer",
-    price: 19.99,
-    rating: 4.7,
-    reviews: 142,
-    stock: 12,
-    image: "https://i.pinimg.com/736x/5a/ef/80/5aef8061935325efd82260504aa63f03.jpg",
-    description: "Deeply hydrates your skin for 24 hours.",
-    category: "moisturizer",
-  },
-  {
-    id: "4", // Changed to string
-    name: "Glossy Pink",
-    price: 22.99,
-    rating: 4.8,
-    reviews: 156,
-    stock: 15,
-    image: "https://i.pinimg.com/736x/88/25/61/882561f70402ca621e1e0e9f8e30a761.jpg",
-    description: "Stunning glossy finish with vibrant pink tone.",
-    category: "gloss",
-  },
-  {
-    id: "5", // Changed to string
-    name: "Berry Bliss",
-    price: 24.99,
-    rating: 4.6,
-    reviews: 98,
-    stock: 9,
-    image: "https://i.pinimg.com/736x/46/ec/77/46ec7739839d8cf00d7a3dc0e7a55e0e.jpg",
-    description: "Rich berry shade with plumping effect.",
-    category: "gloss",
-  },
-  {
-    id: "6", // Changed to string
-    name: "Nude Elegance",
-    price: 20.99,
-    rating: 4.4,
-    reviews: 112,
-    stock: 14,
-    image: "https://i.pinimg.com/1200x/f2/eb/2e/f2eb2e2b45e18b3939fb090ff49725b8.jpg",
-    description: "Timeless nude shade for everyday wear.",
-    category: "gloss",
-  },
-  {
-    id: "7", // Changed to string
-    name: "Coral Shine",
-    price: 21.99,
-    rating: 4.3,
-    reviews: 76,
-    stock: 11,
-    image: "https://i.pinimg.com/736x/23/d0/0d/23d00dba9008163f43baf57510f5784b.jpg",
-    description: "Vibrant coral with shimmering finish.",
-    category: "gloss",
-  },
-  {
-    id: "8", // Changed to string
-    name: "Plumping Gloss",
-    price: 26.99,
-    rating: 4.7,
-    reviews: 134,
-    stock: 7,
-    image: "https://i.pinimg.com/736x/8f/28/ed/8f28ed5ba1652b84ee28eecad26852f0.jpg",
-    description: "Enhances lip volume with hydrating formula.",
-    category: "gloss",
-  },
-  {
-    id: "9", // Changed to string
-    name: "Ruby Red",
-    price: 23.99,
-    rating: 4.9,
-    reviews: 189,
-    stock: 13,
-    image: "https://i.pinimg.com/1200x/6b/12/47/6b12476aa7ea4d3adf477cf40004c7b1.jpg",
-    description: "Classic red with satin finish.",
-    category: "matte",
-  },
-  {
-    id: "10", // Changed to string
-    name: "Mauve Magic",
-    price: 18.99,
-    rating: 4.5,
-    reviews: 95,
-    stock: 16,
-    image: "https://i.pinimg.com/736x/27/67/ff/2767ff4c91c4c82eb38272d61c708fac.jpg",
-    description: "Elegant mauve for sophisticated looks.",
-    category: "matte",
-  },
-  {
-    id: "11", // Changed to string
-    name: "Peach Glow",
-    price: 19.99,
-    rating: 4.6,
-    reviews: 87,
-    stock: 10,
-    image: "https://i.pinimg.com/736x/79/c2/64/79c2648d510f330cf2265b8d47bf98be.jpg",
-    description: "Soft peach with luminous effect.",
-    category: "gloss",
-  },
-  {
-    id: "12", // Changed to string
-    name: "Night Serum",
-    price: 29.99,
-    rating: 4.8,
-    reviews: 167,
-    stock: 5,
-    image: "https://i.pinimg.com/1200x/00/71/9b/00719b42a85d16ed14fd1f10ce865392.jpg",
-    description: "Overnight repair for radiant morning lips.",
-    category: "serum",
-  },
-]
+// Define Product Type
+interface Product {
+  _id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  images: string[];
+  inStock: boolean;
+  stockQuantity: number;
+  shades?: Array<{ name: string; hexCode: string }>;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export default function Shop() {
   const [sortBy, setSortBy] = useState("best-selling")
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const [selectedProduct, setSelectedProduct] = useState<any>(null)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [addedProduct, setAddedProduct] = useState<string | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   
   const { addToCart } = useCart()
   const { isAuthenticated } = useAuth()
   const router = useRouter()
 
+  // Fetch products from API
+  useEffect(() => {
+    fetchProducts()
+  }, [])
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      console.log('🛒 Fetching products from:', `${API_URL}/api/products`)
+      
+      const response = await fetch(`${API_URL}/api/products`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-cache'
+      })
+      
+      console.log('Response status:', response.status)
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch products: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log('Products data received:', data)
+      
+      if (data.success) {
+        console.log(`✅ Found ${data.products?.length || 0} products`)
+        setProducts(data.products || [])
+      } else {
+        throw new Error(data.error || 'Failed to fetch products')
+      }
+    } catch (err: any) {
+      console.error('Error fetching products:', err)
+      setError(err.message || 'Could not load products')
+      // Fallback to empty array
+      setProducts([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Sort products based on selection
   const sortedProducts = [...products].sort((a, b) => {
     switch (sortBy) {
       case "best-selling":
-        return b.reviews - a.reviews // Most reviews first
+        return (b.stockQuantity || 0) - (a.stockQuantity || 0) // Higher stock = more popular
       case "price-low-high":
         return a.price - b.price
       case "price-high-low":
         return b.price - a.price
       case "rating":
-        return b.rating - a.rating
+        // For now, use stock as rating proxy
+        return (b.stockQuantity || 0) - (a.stockQuantity || 0)
       default:
         return 0
     }
   })
 
-  const handleAddToCart = (product: any) => {
+  const handleAddToCart = (product: Product) => {
     // Check if user is authenticated FIRST
     if (!isAuthenticated) {
       // Show login modal instead of redirecting immediately
@@ -184,14 +111,14 @@ export default function Shop() {
     
     // If authenticated, add to cart WITH productId
     addToCart({
-      id: product.id, // Frontend ID (string)
-      productId: product.id, // Same as id for now (should be MongoDB ID in real app)
+      id: product._id, // Use MongoDB _id
+      productId: product._id,
       name: product.name,
       price: product.price,
-      image: product.image,
+      image: product.images?.[0] || '/placeholder.svg',
       category: product.category,
       // description: product.description,
-      // quantity is added by CartContext
+      // quantity: 1
     })
     
     // Show success message
@@ -209,8 +136,13 @@ export default function Shop() {
     // Save product to localStorage before redirecting to login
     if (selectedProduct) {
       localStorage.setItem('pending-cart-item', JSON.stringify({
-        ...selectedProduct,
-        productId: selectedProduct.id // Ensure productId is included
+        id: selectedProduct._id,
+        productId: selectedProduct._id,
+        name: selectedProduct.name,
+        price: selectedProduct.price,
+        image: selectedProduct.images?.[0] || '/placeholder.svg',
+        category: selectedProduct.category,
+        description: selectedProduct.description
       }))
     }
     
@@ -223,12 +155,13 @@ export default function Shop() {
     // Add to cart without login (guest mode)
     if (selectedProduct) {
       addToCart({
-        id: selectedProduct.id,
-        productId: selectedProduct.id, // Include productId
+        id: selectedProduct._id,
+        productId: selectedProduct._id,
         name: selectedProduct.name,
         price: selectedProduct.price,
-        image: selectedProduct.image,
+        image: selectedProduct.images?.[0] || '/placeholder.svg',
         category: selectedProduct.category,
+        // quantity: 1
         // description: selectedProduct.description,
       })
       
@@ -245,17 +178,40 @@ export default function Shop() {
     setShowLoginModal(false)
   }
 
-  const handleGoToLogin = () => {
-    router.push('/login')
-  }
-
-  const handleGoToRegister = () => {
-    router.push('/register')
-  }
-
   const handleCloseModal = () => {
     setShowLoginModal(false)
     setSelectedProduct(null)
+  }
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[rgb(249,210,229)] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading products...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[rgb(249,210,229)] flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-xl shadow-lg max-w-md">
+          <Package size={48} className="mx-auto text-red-400 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Unable to Load Products</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={fetchProducts}
+            className="bg-pink-500 text-white px-6 py-2 rounded-lg hover:bg-pink-600"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -288,19 +244,14 @@ export default function Shop() {
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Explore our premium beauty products designed for radiant, luminous lips
           </p>
-          {!isAuthenticated && (
-            <div className="mt-6 flex justify-center gap-4">
-              {/* Removed empty buttons */}
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Sort */}
+      {/* Sort and Product Count */}
       <div className="container-custom py-4">
         <div className="flex justify-between items-center">
           <div className="text-sm text-gray-600">
-            Showing {sortedProducts.length} products
+            Showing {sortedProducts.length} {sortedProducts.length === 1 ? 'product' : 'products'}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-gray-700">Sort by:</span>
@@ -313,7 +264,7 @@ export default function Shop() {
                 <option value="best-selling">Best selling</option>
                 <option value="price-low-high">Price: Low to High</option>
                 <option value="price-high-low">Price: High to Low</option>
-                <option value="rating">Rating</option>
+                <option value="rating">Most Popular</option>
               </select>
               <ChevronDown size={16} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>
@@ -323,75 +274,93 @@ export default function Shop() {
 
       {/* Products Grid */}
       <div className="container-custom py-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {sortedProducts.map((product) => (
-            <div key={product.id} className="group bg-white rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <Link href={`/product/${product.id}`}>
-                <div className="relative overflow-hidden bg-gray-100 h-64">
-                  <Image
-                    src={product.image || "/placeholder.svg"}
-                    alt={product.name}
-                    fill
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                    className="object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  {product.stock && product.stock < 5 && (
-                    <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-                      Low Stock
-                    </div>
+        {sortedProducts.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-xl">
+            <Package size={64} className="mx-auto text-gray-300 mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Products Available</h3>
+            <p className="text-gray-600 mb-4">Add products through the admin dashboard to get started</p>
+            <button
+              onClick={fetchProducts}
+              className="bg-pink-500 text-white px-6 py-2 rounded-lg hover:bg-pink-600"
+            >
+              Refresh Products
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {sortedProducts.map((product) => (
+              <div key={product._id} className="group bg-white rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
+                <Link href={`/product/${product._id}`}>
+                  <div className="relative overflow-hidden bg-gray-100 h-64">
+                    {product.images && product.images[0] ? (
+                      <Image
+                        src={product.images[0]}
+                        alt={product.name}
+                        fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                        className="object-cover group-hover:scale-110 transition-transform duration-500"
+                        unoptimized={true} // For external images
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50">
+                        <Package size={48} className="text-pink-300" />
+                      </div>
+                    )}
+                    {!product.inStock && (
+                      <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                        Out of Stock
+                      </div>
+                    )}
+                    {product.stockQuantity < 5 && product.inStock && (
+                      <div className="absolute top-4 right-4 bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                        Low Stock
+                      </div>
+                    )}
+                  </div>
+                </Link>
+
+                <div className="p-4 space-y-2">
+                  <div className="flex justify-between items-start">
+                    <h3 className="text-lg font-serif font-semibold text-gray-900 group-hover:text-pink-600 transition-colors">
+                      {product.name}
+                    </h3>
+                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-pink-100 text-pink-600 capitalize">
+                      {product.category}
+                    </span>
+                  </div>
+
+                  <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <span className="text-xl font-semibold text-gray-900">${product.price.toFixed(2)}</span>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        handleAddToCart(product)
+                      }}
+                      disabled={!product.inStock}
+                      className="px-4 py-2 bg-pink-500 text-white rounded-full hover:bg-pink-600 transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={!product.inStock ? "Out of stock" : !isAuthenticated ? "Login to add to cart" : "Add to cart"}
+                    >
+                      <ShoppingBag size={16} />
+                      {product.inStock ? 'Add to Cart' : 'Out of Stock'}
+                    </button>
+                  </div>
+                  
+                  <div className="text-xs text-gray-500">
+                    <span className="font-medium">Stock:</span> {product.stockQuantity} available
+                  </div>
+                  
+                  {!isAuthenticated && product.inStock && (
+                    <p className="text-xs text-gray-500 text-center">
+                      Login to save cart items
+                    </p>
                   )}
                 </div>
-              </Link>
-
-              <div className="p-4 space-y-2">
-                <div className="flex justify-between items-start">
-                  <h3 className="text-lg font-serif font-semibold text-gray-900 group-hover:text-pink-600 transition-colors">
-                    {product.name}
-                  </h3>
-                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-pink-100 text-pink-600">
-                    {product.category}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        size={16}
-                        className={i < Math.floor(product.rating || 0) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-sm text-gray-600">({product.reviews})</span>
-                </div>
-
-                <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
-
-                <div className="flex items-center justify-between pt-2">
-                  <span className="text-xl font-semibold text-gray-900">${product.price.toFixed(2)}</span>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault()
-                      handleAddToCart(product)
-                    }}
-                    className="px-4 py-2 bg-pink-500 text-white rounded-full hover:bg-pink-600 transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={!isAuthenticated ? "Login to add to cart" : "Add to cart"}
-                  >
-                    <ShoppingBag size={16} />
-                    Add to Cart
-                  </button>
-                </div>
-                
-                {!isAuthenticated && (
-                  <p className="text-xs text-gray-500 text-center">
-                    Login to save cart items
-                  </p>
-                )}
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Login Modal */}
@@ -413,12 +382,17 @@ export default function Shop() {
             <div className="mb-6">
               <div className="flex items-center gap-4 p-4 bg-pink-50 rounded-lg mb-4">
                 <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-100">
-                  <Image
-                    src={selectedProduct?.image || "/placeholder.svg"}
-                    alt={selectedProduct?.name}
-                    fill
-                    className="object-cover"
-                  />
+                  {selectedProduct?.images?.[0] ? (
+                    <Image
+                      src={selectedProduct.images[0]}
+                      alt={selectedProduct.name}
+                      fill
+                      className="object-cover"
+                      unoptimized={true}
+                    />
+                  ) : (
+                    <Package className="text-pink-300 absolute inset-0 m-auto" size={24} />
+                  )}
                 </div>
                 <div>
                   <h4 className="font-semibold text-gray-900">{selectedProduct?.name}</h4>

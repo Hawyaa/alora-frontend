@@ -7,8 +7,12 @@ import {
   CheckCircle, XCircle, Clock, Truck,
   Eye, Mail, Phone, MapPin, Filter,
   TrendingUp, CreditCard, Calendar,
-  AlertCircle, User, Copy, MessageSquare
+  AlertCircle, User, Copy, MessageSquare,
+  Home, ShoppingCart, Settings, LogOut,
+  Plus, Edit, Trash2, Search, Upload,
+  BarChart3, Layers, Tag, Image as ImageIcon
 } from 'lucide-react';
+import Link from 'next/link';
 
 interface OrderItem {
   name: string;
@@ -40,6 +44,20 @@ interface Order {
   };
 }
 
+interface Product {
+  _id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  images: string[];
+  inStock: boolean;
+  stockQuantity: number;
+  shades: Array<{ name: string; hexCode: string }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface Stats {
   totalOrders: number;
   totalRevenue: number;
@@ -48,15 +66,26 @@ interface Stats {
   cancelledOrders: number;
   recentOrders: number;
   totalCustomers: number;
+  totalProducts: number;
+  lowStockProducts: number;
+  ordersWithCustomers?: number; // Add this line
   chartData?: {
     labels: string[];
     data: number[];
   };
 }
 
+interface AdminTab {
+  id: 'dashboard' | 'orders' | 'products' | 'customers';
+  label: string;
+  icon: React.ReactNode;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'customers'>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({
     totalOrders: 0,
@@ -65,16 +94,51 @@ export default function AdminDashboard() {
     completedOrders: 0,
     cancelledOrders: 0,
     recentOrders: 0,
-    totalCustomers: 0
+    totalCustomers: 0,
+    totalProducts: 0,
+    lowStockProducts: 0
   });
   const [filter, setFilter] = useState<'all' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'>('all');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
+  
+  // Product Management States
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [newProduct, setNewProduct] = useState({
+    name: '',
+    description: '',
+    price: '',
+    category: 'lipgloss',
+    images: [''],
+    inStock: true,
+    stockQuantity: '10',
+    shades: [] as Array<{ name: string; hexCode: string }>
+  });
+  const [newShade, setNewShade] = useState({ name: '', hexCode: '#ff69b4' });
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+  const adminTabs: AdminTab[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 size={20} /> },
+    { id: 'orders', label: 'Orders', icon: <ShoppingBag size={20} /> },
+    { id: 'products', label: 'Products', icon: <Package size={20} /> },
+    { id: 'customers', label: 'Customers', icon: <Users size={20} /> },
+  ];
 
   useEffect(() => {
     checkAdminAccess();
-    fetchOrders();
-    fetchStats();
-  }, []);
+    if (activeTab === 'orders') {
+      fetchOrders();
+      fetchStats();
+    } else if (activeTab === 'products') {
+      fetchProducts();
+      fetchProductStats();
+    } else if (activeTab === 'dashboard') {
+      fetchStats();
+      fetchOrders();
+      fetchProducts();
+    }
+  }, [activeTab]);
 
   const checkAdminAccess = () => {
     const token = localStorage.getItem('alora-token');
@@ -109,11 +173,10 @@ export default function AdminDashboard() {
         return;
       }
       
-      const response = await fetch('http://localhost:5000/api/admin/orders', {
+      const response = await fetch(`${API_URL}/admin/orders`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      // Check if response is OK
       if (!response.ok) {
         console.error('HTTP error:', response.status);
         if (response.status === 401 || response.status === 403) {
@@ -129,7 +192,6 @@ export default function AdminDashboard() {
       console.log('📊 Orders data received:', data);
       
       if (data && data.success) {
-        // Process orders
         const safeOrders = (data.orders || []).map((order: any) => {
           const customerInfo = order.customerInfo || {};
           
@@ -165,13 +227,55 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('alora-token');
+      
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+      
+      const response = await fetch(`${API_URL}/admin/products`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!response.ok) {
+        console.error('HTTP error:', response.status);
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem('alora-token');
+          localStorage.removeItem('alora-user');
+          router.push('/login');
+          return;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('📦 Products data received:', data);
+      
+      if (data && data.success) {
+        setProducts(data.products || []);
+      } else {
+        console.error('Failed to fetch products:', data?.message || 'No data returned');
+        setProducts([]);
+      }
+    } catch (error: any) {
+      console.error('Error fetching products:', error.message);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem('alora-token');
       
       if (!token) return;
       
-      const response = await fetch('http://localhost:5000/api/admin/stats', {
+      const response = await fetch(`${API_URL}/admin/stats`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -183,20 +287,44 @@ export default function AdminDashboard() {
       const data = await response.json();
       
       if (data && data.success) {
-        setStats(data.stats || {
-          totalOrders: 0,
-          totalRevenue: 0,
-          pendingOrders: 0,
-          completedOrders: 0,
-          cancelledOrders: 0,
-          recentOrders: 0,
-          totalCustomers: 0
-        });
+        setStats(prev => ({
+          ...prev,
+          ...(data.stats || {})
+        }));
       } else {
         console.error('Stats data error:', data?.message);
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
+    }
+  };
+
+  const fetchProductStats = async () => {
+    try {
+      const token = localStorage.getItem('alora-token');
+      
+      if (!token) return;
+      
+      const response = await fetch(`${API_URL}/admin/products`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      
+      if (data && data.success) {
+        const products = data.products || [];
+        const lowStockProducts = products.filter((p: Product) => p.stockQuantity < 5).length;
+        
+        setStats(prev => ({
+          ...prev,
+          totalProducts: products.length,
+          lowStockProducts: lowStockProducts
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching product stats:', error);
     }
   };
 
@@ -209,7 +337,7 @@ export default function AdminDashboard() {
         return;
       }
       
-      const response = await fetch(`http://localhost:5000/api/admin/orders/${orderId}/status`, {
+      const response = await fetch(`${API_URL}/admin/orders/${orderId}/status`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -221,7 +349,6 @@ export default function AdminDashboard() {
       const data = await response.json();
       
       if (data.success) {
-        // Refresh data
         await fetchOrders();
         await fetchStats();
       } else {
@@ -232,7 +359,197 @@ export default function AdminDashboard() {
     }
   };
 
-  // Helper to copy text to clipboard
+  const handleAddProduct = async () => {
+    try {
+      const token = localStorage.getItem('alora-token');
+      
+      if (!token) {
+        alert('Please login first');
+        return;
+      }
+
+      // Validate required fields
+      if (!newProduct.name || !newProduct.description || !newProduct.price) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      const productData = {
+        ...newProduct,
+        price: parseFloat(newProduct.price),
+        stockQuantity: parseInt(newProduct.stockQuantity) || 0,
+        images: newProduct.images.filter(img => img.trim() !== '')
+      };
+
+      const response = await fetch(`${API_URL}/admin/products`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(productData)
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('Product added successfully!');
+        setShowProductModal(false);
+        resetProductForm();
+        await fetchProducts();
+        await fetchProductStats();
+      } else {
+        alert(`Failed to add product: ${data.message}`);
+      }
+    } catch (error) {
+      console.error('Error adding product:', error);
+      alert('Error adding product. Please try again.');
+    }
+  };
+
+  const handleUpdateProduct = async () => {
+    if (!editingProduct) return;
+    
+    try {
+      const token = localStorage.getItem('alora-token');
+      
+      if (!token) {
+        alert('Please login first');
+        return;
+      }
+
+      const productData = {
+        ...newProduct,
+        price: parseFloat(newProduct.price),
+        stockQuantity: parseInt(newProduct.stockQuantity) || 0,
+        images: newProduct.images.filter(img => img.trim() !== '')
+      };
+
+      const response = await fetch(`${API_URL}/admin/products/${editingProduct._id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(productData)
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('Product updated successfully!');
+        setShowProductModal(false);
+        setEditingProduct(null);
+        resetProductForm();
+        await fetchProducts();
+      } else {
+        alert(`Failed to update product: ${data.message}`);
+      }
+    } catch (error) {
+      console.error('Error updating product:', error);
+      alert('Error updating product. Please try again.');
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    if (!confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('alora-token');
+      
+      if (!token) {
+        alert('Please login first');
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/admin/products/${productId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('Product deleted successfully!');
+        await fetchProducts();
+        await fetchProductStats();
+      } else {
+        alert(`Failed to delete product: ${data.message}`);
+      }
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      alert('Error deleting product. Please try again.');
+    }
+  };
+
+  const editProduct = (product: Product) => {
+    setEditingProduct(product);
+    setNewProduct({
+      name: product.name,
+      description: product.description,
+      price: product.price.toString(),
+      category: product.category,
+      images: [...product.images],
+      inStock: product.inStock,
+      stockQuantity: product.stockQuantity.toString(),
+      shades: [...product.shades]
+    });
+    setShowProductModal(true);
+  };
+
+  const resetProductForm = () => {
+    setNewProduct({
+      name: '',
+      description: '',
+      price: '',
+      category: 'lipgloss',
+      images: [''],
+      inStock: true,
+      stockQuantity: '10',
+      shades: []
+    });
+    setNewShade({ name: '', hexCode: '#ff69b4' });
+  };
+
+  const addShade = () => {
+    if (newShade.name.trim() && newShade.hexCode) {
+      setNewProduct({
+        ...newProduct,
+        shades: [...newProduct.shades, { ...newShade }]
+      });
+      setNewShade({ name: '', hexCode: '#ff69b4' });
+    }
+  };
+
+  const removeShade = (index: number) => {
+    const updatedShades = [...newProduct.shades];
+    updatedShades.splice(index, 1);
+    setNewProduct({ ...newProduct, shades: updatedShades });
+  };
+
+  const addImageField = () => {
+    setNewProduct({
+      ...newProduct,
+      images: [...newProduct.images, '']
+    });
+  };
+
+  const removeImageField = (index: number) => {
+    const updatedImages = [...newProduct.images];
+    updatedImages.splice(index, 1);
+    setNewProduct({ ...newProduct, images: updatedImages });
+  };
+
+  const updateImage = (index: number, value: string) => {
+    const updatedImages = [...newProduct.images];
+    updatedImages[index] = value;
+    setNewProduct({ ...newProduct, images: updatedImages });
+  };
+
   const copyToClipboard = (text: string, type: string) => {
     navigator.clipboard.writeText(text)
       .then(() => {
@@ -243,9 +560,7 @@ export default function AdminDashboard() {
       });
   };
 
-  // Helper to initiate WhatsApp message
   const openWhatsApp = (phone: string) => {
-    // Clean phone number (remove non-numeric characters)
     const cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone) {
       window.open(`https://wa.me/${cleanPhone}`, '_blank');
@@ -305,7 +620,563 @@ export default function AdminDashboard() {
     }
   };
 
-  if (loading && orders.length === 0) {
+  const renderDashboard = () => (
+    <>
+      {/* Welcome Card */}
+      <div className="bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-2xl p-6 mb-8 shadow-lg">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold mb-2">Admin Dashboard</h2>
+            <p className="opacity-90">Manage your e-commerce store efficiently</p>
+          </div>
+          <div className="bg-white/20 p-3 rounded-xl">
+            <BarChart3 size={24} />
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Total Orders</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.totalOrders}</p>
+              <p className="text-xs text-gray-500 mt-1">{stats.recentOrders} new this week</p>
+            </div>
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <ShoppingBag className="text-blue-600" size={24} />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
+              <p className="text-3xl font-bold text-gray-900">${stats.totalRevenue.toFixed(2)}</p>
+              <p className="text-xs text-gray-500 mt-1">All-time sales</p>
+            </div>
+            <div className="bg-green-50 p-3 rounded-lg">
+              <DollarSign className="text-green-600" size={24} />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Total Products</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.totalProducts}</p>
+              <p className="text-xs text-gray-500 mt-1">{stats.lowStockProducts} low stock</p>
+            </div>
+            <div className="bg-purple-50 p-3 rounded-lg">
+              <Package className="text-purple-600" size={24} />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Pending Orders</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.pendingOrders}</p>
+              <p className="text-xs text-gray-500 mt-1">Require attention</p>
+            </div>
+            <div className="bg-yellow-50 p-3 rounded-lg">
+              <Clock className="text-yellow-600" size={24} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <button
+          onClick={() => setActiveTab('products')}
+          className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow text-left"
+        >
+          <div className="flex items-center gap-4">
+            <div className="bg-pink-50 p-3 rounded-lg">
+              <Plus className="text-pink-600" size={24} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Add New Product</h3>
+              <p className="text-sm text-gray-600">Add products to your store</p>
+            </div>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('orders')}
+          className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow text-left"
+        >
+          <div className="flex items-center gap-4">
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <ShoppingBag className="text-blue-600" size={24} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Manage Orders</h3>
+              <p className="text-sm text-gray-600">View and update customer orders</p>
+            </div>
+          </div>
+        </button>
+<div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
+  <div className="flex items-center justify-between">
+    <div>
+      <p className="text-sm text-gray-600 mb-1">Total Customers</p>
+      <p className="text-3xl font-bold text-gray-900">{stats.totalCustomers}</p>
+      <p className="text-xs text-gray-500 mt-1">
+        {stats.ordersWithCustomers ? `${stats.ordersWithCustomers} orders placed` : 'No orders yet'}
+      </p>
+    </div>
+    <div className="bg-purple-50 p-3 rounded-lg">
+      <Users className="text-purple-600" size={24} />
+    </div>
+  </div>
+</div>
+      </div>
+
+      {/* Recent Orders */}
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Recent Orders</h3>
+          <button
+            onClick={() => setActiveTab('orders')}
+            className="text-pink-600 hover:text-pink-700 text-sm font-medium"
+          >
+            View All Orders →
+          </button>
+        </div>
+        <div className="space-y-4">
+          {orders.slice(0, 5).map((order) => (
+            <div key={order._id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
+              <div>
+                <p className="font-medium text-gray-900">{order.orderNumber}</p>
+                <p className="text-sm text-gray-600">
+                  {order.customerInfo?.name || 'Guest Customer'} • {formatDate(order.createdAt)}
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                  {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                </span>
+                <span className="font-semibold">${order.totalAmount?.toFixed(2) || '0.00'}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+
+  const renderOrders = () => (
+    <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div className="p-6 border-b">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Customer Orders</h2>
+            <p className="text-gray-600 text-sm mt-1">
+              Showing {filteredOrders.length} of {orders.length} orders
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter size={16} className="text-gray-500" />
+              <select 
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as any)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              >
+                <option value="all">All Orders</option>
+                <option value="pending">Pending</option>
+                <option value="processing">Processing</option>
+                <option value="shipped">Shipped</option>
+                <option value="delivered">Delivered</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {filteredOrders.length === 0 ? (
+        <div className="text-center py-12">
+          <Package size={48} className="mx-auto text-gray-400 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No orders found</h3>
+          <p className="text-gray-600">
+            {filter === 'all' 
+              ? 'No orders have been placed yet.' 
+              : `No ${filter} orders found.`}
+          </p>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-200">
+          {filteredOrders.map((order) => {
+            const customer = order.customerInfo || {
+              name: 'Guest Customer',
+              email: 'No email provided',
+              phone: 'No phone provided'
+            };
+            const orderTotal = order.totalAmount || 0;
+            const orderItems = order.items || [];
+            
+            return (
+              <div key={order._id} className="p-6 hover:bg-gray-50 transition-colors">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Order Info */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="font-semibold text-gray-900">
+                          {order.orderNumber || `Order ${order._id.substring(0, 8)}`}
+                        </p>
+                        <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
+                          <Calendar size={14} />
+                          {formatDate(order.createdAt)} at {formatTime(order.createdAt)}
+                        </p>
+                      </div>
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                        {getStatusIcon(order.status)}
+                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <p className="text-sm">
+                        <span className="text-gray-600">Payment: </span>
+                        <span className="font-medium">
+                          {order.paymentMethod === 'cash' ? 'Cash on Delivery' : order.paymentMethod === 'online' ? 'Online' : 'Unknown'}
+                        </span>
+                      </p>
+                      <p className="text-lg font-bold text-gray-900">
+                        ${orderTotal.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Customer Info */}
+                  <div>
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="font-medium text-gray-900">Customer Contact</h4>
+                      <div className="flex gap-2">
+                        {customer?.email && customer.email !== 'No email provided' && (
+                          <button
+                            onClick={() => copyToClipboard(customer.email || '', 'Email')}
+                            className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded flex items-center gap-1 hover:bg-blue-200"
+                            title="Copy email"
+                          >
+                            <Copy size={12} />
+                            Copy
+                          </button>
+                        )}
+                        {customer?.phone && customer.phone !== 'No phone provided' && (
+                          <button
+                            onClick={() => openWhatsApp(customer.phone || '')}
+                            className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded flex items-center gap-1 hover:bg-green-200"
+                            title="Message on WhatsApp"
+                          >
+                            <MessageSquare size={12} />
+                            WhatsApp
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
+                      {/* Name */}
+                      <div className="flex items-center gap-3">
+                        <div className="bg-pink-100 p-2 rounded-lg">
+                          <User className="text-pink-600" size={16} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-600">Customer Name</p>
+                          <p className="font-medium text-gray-900">{customer?.name || 'Guest Customer'}</p>
+                        </div>
+                      </div>
+                      
+                      {/* Email */}
+                      <div className="flex items-center gap-3">
+                        <div className="bg-blue-100 p-2 rounded-lg">
+                          <Mail className="text-blue-600" size={16} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-600">Email Address</p>
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium text-gray-900 break-all">{customer?.email || 'No email provided'}</p>
+                            {customer?.email && customer.email !== 'No email provided' && (
+                              <button
+                                onClick={() => window.location.href = `mailto:${customer.email}`}
+                                className="text-blue-600 hover:text-blue-800 text-sm ml-2"
+                                title="Send email"
+                              >
+                                Email
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Phone */}
+                      <div className="flex items-center gap-3">
+                        <div className="bg-green-100 p-2 rounded-lg">
+                          <Phone className="text-green-600" size={16} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-600">Phone Number</p>
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium text-gray-900">{customer?.phone || 'No phone provided'}</p>
+                            {customer?.phone && customer.phone !== 'No phone provided' && (
+                              <button
+                                onClick={() => window.location.href = `tel:${customer.phone}`}
+                                className="text-green-600 hover:text-green-800 text-sm ml-2"
+                                title="Call customer"
+                              >
+                                Call
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Order Items & Actions */}
+                  <div>
+                    <div className="flex justify-between items-start mb-3">
+                      <h4 className="font-medium text-gray-900">
+                        Order Items ({orderItems.length})
+                      </h4>
+                      <select
+                        value={order.status}
+                        onChange={(e) => updateOrderStatus(order._id, e.target.value)}
+                        className="text-xs border border-gray-300 rounded-lg px-2 py-1 focus:ring-1 focus:ring-pink-500 focus:border-transparent"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                    
+                    {orderItems.length > 0 ? (
+                      <>
+                        <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
+                          {orderItems.map((item, index) => (
+                            <div key={index} className="flex justify-between text-sm">
+                              <div>
+                                <p className="font-medium">{item.name || 'Unnamed Product'}</p>
+                                <p className="text-gray-600 text-xs">
+                                  {item.quantity || 1} × ${(item.price || 0).toFixed(2)}
+                                  {item.shade && ` • Shade: ${item.shade}`}
+                                </p>
+                              </div>
+                              <p className="font-semibold">
+                                ${(((item.quantity || 1) * (item.price || 0))).toFixed(2)}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div className="mt-4 flex gap-2">
+                          <button
+                            onClick={() => copyToClipboard(`${customer.name}\n${customer.email}\n${customer.phone}`, 'Customer Info')}
+                            className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1"
+                          >
+                            <Copy size={14} />
+                            Copy Info
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-2 text-gray-500 text-sm py-2">
+                        <AlertCircle size={14} />
+                        No items in this order
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderProducts = () => (
+    <div className="space-y-6">
+      {/* Products Header */}
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Product Management</h2>
+            <p className="text-gray-600 mt-1">Manage your store products</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            >
+              Back to Dashboard
+            </button>
+            <button
+              onClick={() => {
+                setEditingProduct(null);
+                resetProductForm();
+                setShowProductModal(true);
+              }}
+              className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 flex items-center gap-2"
+            >
+              <Plus size={20} />
+              Add Product
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Products Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {products.map((product) => (
+          <div key={product._id} className="bg-white rounded-xl shadow-sm border overflow-hidden group">
+            
+<div className="relative h-48 bg-gray-100">
+  {product.images && product.images[0] ? (
+    <div 
+      className="w-full h-full bg-cover bg-center"
+      style={{ backgroundImage: `url(${product.images[0]})` }}
+    />
+  ) : (
+    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50">
+      <Package className="text-pink-300" size={48} />
+    </div>
+  )}
+  <div className="absolute top-3 right-3">
+    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+      product.inStock 
+        ? product.stockQuantity < 5 
+          ? 'bg-yellow-100 text-yellow-800'
+          : 'bg-green-100 text-green-800'
+        : 'bg-red-100 text-red-800'
+    }`}>
+      {product.inStock 
+        ? product.stockQuantity < 5 
+          ? 'Low Stock'
+          : 'In Stock'
+        : 'Out of Stock'
+      }
+    </span>
+  </div>
+</div>
+            <div className="p-4">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-semibold text-gray-900 line-clamp-1">{product.name}</h3>
+                <span className="text-pink-600 font-bold">${product.price.toFixed(2)}</span>
+              </div>
+              
+              <p className="text-sm text-gray-600 mb-3 line-clamp-2">{product.description}</p>
+              
+              <div className="flex items-center justify-between text-sm text-gray-500">
+                <div className="flex items-center gap-2">
+                  <Tag size={14} />
+                  <span className="capitalize">{product.category}</span>
+                </div>
+                <span>Stock: {product.stockQuantity}</span>
+              </div>
+              
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => editProduct(product)}
+                  className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 flex items-center justify-center gap-2"
+                >
+                  <Edit size={16} />
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDeleteProduct(product._id)}
+                  className="px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {products.length === 0 && (
+        <div className="text-center py-12 bg-white rounded-xl">
+          <Package size={64} className="mx-auto text-gray-300 mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Products Yet</h3>
+          <p className="text-gray-600 mb-6">Add your first product to start selling</p>
+          <button
+            onClick={() => {
+              setEditingProduct(null);
+              resetProductForm();
+              setShowProductModal(true);
+            }}
+            className="px-6 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 flex items-center gap-2 mx-auto"
+          >
+            <Plus size={20} />
+            Add First Product
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderCustomers = () => (
+    <div className="bg-white rounded-xl shadow-sm border p-6">
+      <h2 className="text-2xl font-bold text-gray-900 mb-4">Customer Management</h2>
+      <p className="text-gray-600 mb-6">View and manage your customers</p>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl">
+          <div className="flex items-center gap-4">
+            <div className="bg-white p-3 rounded-lg">
+              <Users className="text-blue-600" size={24} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Total Customers</h3>
+              <p className="text-3xl font-bold text-gray-900">{stats.totalCustomers}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl">
+          <div className="flex items-center gap-4">
+            <div className="bg-white p-3 rounded-lg">
+              <ShoppingBag className="text-green-600" size={24} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Average Orders</h3>
+              <p className="text-3xl font-bold text-gray-900">
+                {stats.totalCustomers > 0 ? (stats.totalOrders / stats.totalCustomers).toFixed(1) : '0.0'}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl">
+          <div className="flex items-center gap-4">
+            <div className="bg-white p-3 rounded-lg">
+              <DollarSign className="text-purple-600" size={24} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Customer Value</h3>
+              <p className="text-3xl font-bold text-gray-900">
+                ${stats.totalCustomers > 0 ? (stats.totalRevenue / stats.totalCustomers).toFixed(2) : '0.00'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (loading && activeTab === 'orders' && orders.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -321,17 +1192,18 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-              <p className="text-gray-600">Manage orders and view customer information</p>
+              <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
+              <p className="text-gray-600">Alora Lipgloss Store Management</p>
             </div>
             <div className="flex items-center gap-4">
               <button
-                onClick={fetchOrders}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                onClick={() => window.open('/', '_blank')}
+                className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2"
               >
-                Refresh Orders
+                <Home size={20} />
+                View Store
               </button>
               <button
                 onClick={() => {
@@ -339,8 +1211,9 @@ export default function AdminDashboard() {
                   localStorage.removeItem('alora-user');
                   router.push('/login');
                 }}
-                className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2"
               >
+                <LogOut size={20} />
                 Logout
               </button>
             </div>
@@ -349,402 +1222,249 @@ export default function AdminDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Card */}
-        <div className="bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-2xl p-6 mb-8 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold mb-2">Customer Orders Dashboard</h2>
-              <p className="opacity-90">Manage orders and communicate with customers</p>
-            </div>
-            <div className="bg-white/20 p-3 rounded-xl">
-              <Users size={24} />
-            </div>
-          </div>
-        </div>
-
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Total Orders</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalOrders}</p>
-                <p className="text-xs text-gray-500 mt-1">{stats.recentOrders} new this week</p>
-              </div>
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <ShoppingBag className="text-blue-600" size={24} />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
-                <p className="text-3xl font-bold text-gray-900">${stats.totalRevenue.toFixed(2)}</p>
-                <p className="text-xs text-gray-500 mt-1">All-time sales</p>
-              </div>
-              <div className="bg-green-50 p-3 rounded-lg">
-                <DollarSign className="text-green-600" size={24} />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Pending Orders</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.pendingOrders}</p>
-                <p className="text-xs text-gray-500 mt-1">Require attention</p>
-              </div>
-              <div className="bg-yellow-50 p-3 rounded-lg">
-                <Clock className="text-yellow-600" size={24} />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Total Customers</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalCustomers}</p>
-                <p className="text-xs text-gray-500 mt-1">Unique customers</p>
-              </div>
-              <div className="bg-purple-50 p-3 rounded-lg">
-                <User className="text-purple-600" size={24} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Orders Section */}
+        {/* Navigation Tabs */}
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden mb-8">
-          <div className="p-6 border-b">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">Customer Orders</h2>
-                <p className="text-gray-600 text-sm mt-1">
-                  Showing {filteredOrders.length} of {orders.length} orders
-                </p>
-              </div>
-              
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Filter size={16} className="text-gray-500" />
-                  <select 
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value as any)}
-                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  >
-                    <option value="all">All Orders</option>
-                    <option value="pending">Pending</option>
-                    <option value="processing">Processing</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
-              </div>
-            </div>
+          <div className="flex overflow-x-auto">
+            {adminTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-3 px-6 py-4 text-sm font-medium transition-colors whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'bg-pink-50 text-pink-600 border-b-2 border-pink-500'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
           </div>
-          
-          {filteredOrders.length === 0 ? (
-            <div className="text-center py-12">
-              <Package size={48} className="mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No orders found</h3>
-              <p className="text-gray-600">
-                {filter === 'all' 
-                  ? 'No orders have been placed yet.' 
-                  : `No ${filter} orders found.`}
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {filteredOrders.map((order) => {
-                const customer = order.customerInfo || {
-                  name: 'Guest Customer',
-                  email: 'No email provided',
-                  phone: 'No phone provided'
-                };
-                const orderTotal = order.totalAmount || 0;
-                const orderItems = order.items || [];
-                
-                return (
-                  <div key={order._id} className="p-6 hover:bg-gray-50 transition-colors">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      {/* Order Info */}
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <p className="font-semibold text-gray-900">
-                              {order.orderNumber || `Order ${order._id.substring(0, 8)}`}
-                            </p>
-                            <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
-                              <Calendar size={14} />
-                              {formatDate(order.createdAt)} at {formatTime(order.createdAt)}
-                            </p>
-                          </div>
-                          <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                            {getStatusIcon(order.status)}
-                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                          </span>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <p className="text-sm">
-                            <span className="text-gray-600">Payment: </span>
-                            <span className="font-medium">
-                              {order.paymentMethod === 'cash' ? 'Cash on Delivery' : order.paymentMethod === 'online' ? 'Online' : 'Unknown'}
-                            </span>
-                          </p>
-                          <p className="text-lg font-bold text-gray-900">
-                            ${orderTotal.toFixed(2)}
-                          </p>
-                        </div>
-                      </div>
+        </div>
 
-                      {/* Customer Info */}
-                      <div>
-                        <div className="flex justify-between items-center mb-3">
-                          <h4 className="font-medium text-gray-900">Customer Contact</h4>
-                          <div className="flex gap-2">
-                            {customer?.email && customer.email !== 'No email provided' && (
-                              <button
-                                onClick={() => copyToClipboard(customer.email || '', 'Email')}
-                                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded flex items-center gap-1 hover:bg-blue-200"
-                                title="Copy email"
-                              >
-                                <Copy size={12} />
-                                Copy
-                              </button>
-                            )}
-                            {customer?.phone && customer.phone !== 'No phone provided' && (
-                              <button
-                                onClick={() => openWhatsApp(customer.phone || '')}
-                                className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded flex items-center gap-1 hover:bg-green-200"
-                                title="Message on WhatsApp"
-                              >
-                                <MessageSquare size={12} />
-                                WhatsApp
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
-                          {/* Name */}
-                          <div className="flex items-center gap-3">
-                            <div className="bg-pink-100 p-2 rounded-lg">
-                              <User className="text-pink-600" size={16} />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm text-gray-600">Customer Name</p>
-                              <p className="font-medium text-gray-900">{customer?.name || 'Guest Customer'}</p>
-                            </div>
-                          </div>
-                          
-                          {/* Email */}
-                          <div className="flex items-center gap-3">
-                            <div className="bg-blue-100 p-2 rounded-lg">
-                              <Mail className="text-blue-600" size={16} />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm text-gray-600">Email Address</p>
-                              <div className="flex items-center justify-between">
-                                <p className="font-medium text-gray-900 break-all">{customer?.email || 'No email provided'}</p>
-                                {customer?.email && customer.email !== 'No email provided' && (
-                                  <button
-                                    onClick={() => window.location.href = `mailto:${customer.email}`}
-                                    className="text-blue-600 hover:text-blue-800 text-sm ml-2"
-                                    title="Send email"
-                                  >
-                                    Email
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Phone */}
-                          <div className="flex items-center gap-3">
-                            <div className="bg-green-100 p-2 rounded-lg">
-                              <Phone className="text-green-600" size={16} />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm text-gray-600">Phone Number</p>
-                              <div className="flex items-center justify-between">
-                                <p className="font-medium text-gray-900">{customer?.phone || 'No phone provided'}</p>
-                                {customer?.phone && customer.phone !== 'No phone provided' && (
-                                  <button
-                                    onClick={() => window.location.href = `tel:${customer.phone}`}
-                                    className="text-green-600 hover:text-green-800 text-sm ml-2"
-                                    title="Call customer"
-                                  >
-                                    Call
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Delivery Address */}
-                          {order.deliveryAddress && (
-                            <div className="flex items-start gap-3">
-                              <div className="bg-gray-100 p-2 rounded-lg">
-                                <MapPin className="text-gray-600" size={16} />
-                              </div>
-                              <div className="flex-1">
-                                <p className="text-sm text-gray-600">Delivery Address</p>
-                                <p className="text-sm text-gray-900">
-                                  {order.deliveryAddress.street || ''}
-                                  {order.deliveryAddress.street && order.deliveryAddress.city && ', '}
-                                  {order.deliveryAddress.city || ''}
-                                  {order.deliveryAddress.state && `, ${order.deliveryAddress.state}`}
-                                  {order.deliveryAddress.country && `, ${order.deliveryAddress.country}`}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+        {/* Content Area */}
+        {activeTab === 'dashboard' && renderDashboard()}
+        {activeTab === 'orders' && renderOrders()}
+        {activeTab === 'products' && renderProducts()}
+        {activeTab === 'customers' && renderCustomers()}
+      </div>
 
-                      {/* Order Items & Actions */}
-                      <div>
-                        <div className="flex justify-between items-start mb-3">
-                          <h4 className="font-medium text-gray-900">
-                            Order Items ({orderItems.length})
-                          </h4>
-                          <select
-                            value={order.status}
-                            onChange={(e) => updateOrderStatus(order._id, e.target.value)}
-                            className="text-xs border border-gray-300 rounded-lg px-2 py-1 focus:ring-1 focus:ring-pink-500 focus:border-transparent"
+      {/* Product Modal */}
+      {showProductModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-900">
+                  {editingProduct ? 'Edit Product' : 'Add New Product'}
+                </h3>
+                <button
+                  onClick={() => setShowProductModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Basic Info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Product Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={newProduct.name}
+                      onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                      placeholder="e.g., Glossy Lip Gloss"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Category *
+                    </label>
+                    <select
+                      value={newProduct.category}
+                      onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                    >
+                      <option value="lipgloss">Lip Gloss</option>
+                      <option value="lipstick">Lipstick</option>
+                      <option value="lipbalm">Lip Balm</option>
+                      <option value="accessories">Accessories</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Price & Stock */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Price ($) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newProduct.price}
+                      onChange={(e) => setNewProduct({...newProduct, price: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Stock Quantity
+                    </label>
+                    <input
+                      type="number"
+                      value={newProduct.stockQuantity}
+                      onChange={(e) => setNewProduct({...newProduct, stockQuantity: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                      placeholder="10"
+                    />
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description *
+                  </label>
+                  <textarea
+                    value={newProduct.description}
+                    onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                    placeholder="Describe your product..."
+                  />
+                </div>
+
+                {/* Images */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Image URLs (one per line)
+                  </label>
+                  <div className="space-y-2">
+                    {newProduct.images.map((image, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={image}
+                          onChange={(e) => updateImage(index, e.target.value)}
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                          placeholder="https://example.com/image.jpg"
+                        />
+                        {newProduct.images.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeImageField(index)}
+                            className="px-3 py-2 text-red-600 hover:text-red-800"
                           >
-                            <option value="pending">Pending</option>
-                            <option value="processing">Processing</option>
-                            <option value="shipped">Shipped</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                        </div>
-                        
-                        {orderItems.length > 0 ? (
-                          <>
-                            <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
-                              {orderItems.map((item, index) => (
-                                <div key={index} className="flex justify-between text-sm">
-                                  <div>
-                                    <p className="font-medium">{item.name || 'Unnamed Product'}</p>
-                                    <p className="text-gray-600 text-xs">
-                                      {item.quantity || 1} × ${(item.price || 0).toFixed(2)}
-                                      {item.shade && ` • Shade: ${item.shade}`}
-                                    </p>
-                                  </div>
-                                  <p className="font-semibold">
-                                    ${(((item.quantity || 1) * (item.price || 0))).toFixed(2)}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                            
-                            <div className="mt-4 flex gap-2">
-                              <button
-                                onClick={() => {
-                                  console.log('View order:', order._id);
-                                }}
-                                className="text-pink-600 hover:text-pink-700 text-sm font-medium flex items-center gap-1"
-                              >
-                                <Eye size={14} />
-                                View Details
-                              </button>
-                              <button
-                                onClick={() => copyToClipboard(`${customer.name}\n${customer.email}\n${customer.phone}`, 'Customer Info')}
-                                className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1"
-                              >
-                                <Copy size={14} />
-                                Copy Info
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex items-center gap-2 text-gray-500 text-sm py-2">
-                            <AlertCircle size={14} />
-                            No items in this order
-                          </div>
+                            Remove
+                          </button>
                         )}
                       </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={addImageField}
+                      className="text-sm text-pink-600 hover:text-pink-700 flex items-center gap-1"
+                    >
+                      <Plus size={16} />
+                      Add another image URL
+                    </button>
+                  </div>
+                </div>
+
+                {/* Shades */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Product Shades
+                  </label>
+                  <div className="space-y-3">
+                    {newProduct.shades.map((shade, index) => (
+                      <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div
+                          className="w-8 h-8 rounded-full border border-gray-300"
+                          style={{ backgroundColor: shade.hexCode }}
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium">{shade.name}</p>
+                          <p className="text-sm text-gray-600">{shade.hexCode}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeShade(index)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                    
+                    <div className="flex gap-3">
+                      <input
+                        type="text"
+                        value={newShade.name}
+                        onChange={(e) => setNewShade({...newShade, name: e.target.value})}
+                        placeholder="Shade name"
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                      />
+                      <input
+                        type="color"
+                        value={newShade.hexCode}
+                        onChange={(e) => setNewShade({...newShade, hexCode: e.target.value})}
+                        className="w-12 h-12 cursor-pointer"
+                      />
+                      <button
+                        type="button"
+                        onClick={addShade}
+                        className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600"
+                      >
+                        Add Shade
+                      </button>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Customer Communication Tools */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
-            <div className="space-y-3">
-              <button
-                onClick={fetchOrders}
-                className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors flex items-center gap-3"
-              >
-                <div>
-                  <p className="font-medium text-gray-900">Refresh Orders</p>
-                  <p className="text-sm text-gray-600">Get latest customer orders</p>
                 </div>
-              </button>
-              <button
-                onClick={() => {
-                  // Export customer emails
-                  const emails = orders
-                    .map(order => order.customerInfo?.email)
-                    .filter(email => email && email !== 'No email provided')
-                    .join(', ');
-                  copyToClipboard(emails, 'Customer emails');
-                }}
-                className="w-full text-left px-4 py-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-3"
-              >
-                <Mail size={16} className="text-blue-600" />
-                <div>
-                  <p className="font-medium text-gray-900">Copy All Emails</p>
-                  <p className="text-sm text-gray-600">Copy all customer emails</p>
+
+                {/* In Stock Toggle */}
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="inStock"
+                    checked={newProduct.inStock}
+                    onChange={(e) => setNewProduct({...newProduct, inStock: e.target.checked})}
+                    className="w-5 h-5 text-pink-600 rounded focus:ring-pink-500"
+                  />
+                  <label htmlFor="inStock" className="text-sm font-medium text-gray-700">
+                    Product is in stock and available for purchase
+                  </label>
                 </div>
-              </button>
-            </div>
-          </div>
 
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Customer Summary</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Total Customers</span>
-                <span className="font-semibold">{stats.totalCustomers}</span>
+                {/* Actions */}
+                <div className="flex gap-3 pt-6 border-t">
+                  <button
+                    onClick={() => setShowProductModal(false)}
+                    className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={editingProduct ? handleUpdateProduct : handleAddProduct}
+                    className="flex-1 px-6 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600"
+                  >
+                    {editingProduct ? 'Update Product' : 'Add Product'}
+                  </button>
+                </div>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Orders Today</span>
-                <span className="font-semibold">{stats.recentOrders}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Average Order</span>
-                <span className="font-semibold">
-                  ${stats.totalOrders > 0 ? (stats.totalRevenue / stats.totalOrders).toFixed(2) : '0.00'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Contact Tips</h3>
-            <div className="space-y-3 text-sm text-gray-600">
-              <p>• Click "Copy" to copy customer email</p>
-              <p>• Click "WhatsApp" to message customer</p>
-              <p>• Click "Call" to call customer directly</p>
-              <p>• Use "Copy Info" for complete details</p>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
