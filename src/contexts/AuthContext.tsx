@@ -50,47 +50,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      console.log('Attempting login for:', email)
+      console.log('Attempting login for:', email);
       
       const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
-      })
+      });
       
-      const data = await response.json()
-      console.log('Login response:', data)
+      const data = await response.json();
+      console.log('Login response:', data);
       
-      // FIXED: Don't throw error, just return it
+      // Check for errors - but DON'T throw generic Error
       if (!response.ok || !data.success) {
+        // Return error object instead of throwing
         return { 
           success: false, 
-          error: data.error || 'Login failed' 
-        }
+          error: data.error || data.message || 'Invalid email or password' 
+        };
       }
       
       // Clear any guest cart before setting new user
-      clearUserCart()
+      clearUserCart();
       
-      setToken(data.token)
-      setUser(data.user)
-      setIsAuthenticated(true)
-      localStorage.setItem('alora-token', data.token)
-      localStorage.setItem('alora-user', JSON.stringify(data.user))
+      setToken(data.token);
+      setUser(data.user);
+      setIsAuthenticated(true);
+      localStorage.setItem('alora-token', data.token);
+      localStorage.setItem('alora-user', JSON.stringify(data.user));
       
       // Load user's cart from backend if available
-      await loadUserCart(data.token)
+      await loadUserCart(data.token);
       
-      return { success: true, user: data.user }
+      return { 
+        success: true, 
+        user: data.user,
+        token: data.token 
+      };
       
     } catch (error: any) {
-      console.error('Login error:', error)
-      return { 
-        success: false, 
-        error: error.message || 'Network error. Please check your connection.' 
-      }
+      console.error('Login error:', error);
+      // For network errors, still throw
+      throw error;
     }
-  }
+  };
 
   const register = async (userData: any) => {
     try {
