@@ -623,7 +623,7 @@ export default function AdminDashboard() {
   const renderDashboard = () => (
     <>
       {/* Welcome Card */}
-      <div className="bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-2xl p-6 mb-8 shadow-lg">
+      {/* <div className="bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-2xl p-6 mb-8 shadow-lg">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold mb-2">Admin Dashboard</h2>
@@ -633,7 +633,7 @@ export default function AdminDashboard() {
             <BarChart3 size={24} />
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

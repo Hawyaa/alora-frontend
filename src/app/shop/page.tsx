@@ -117,8 +117,6 @@ export default function Shop() {
       price: product.price,
       image: product.images?.[0] || '/placeholder.svg',
       category: product.category,
-      // description: product.description,
-      // quantity: 1
     })
     
     // Show success message
@@ -161,8 +159,6 @@ export default function Shop() {
         price: selectedProduct.price,
         image: selectedProduct.images?.[0] || '/placeholder.svg',
         category: selectedProduct.category,
-        // quantity: 1
-        // description: selectedProduct.description,
       })
       
       // Show success message
@@ -289,73 +285,82 @@ export default function Shop() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {sortedProducts.map((product) => (
-              <div key={product._id} className="group bg-white rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
-                <Link href={`/product/${product._id}`}>
-                  <div className="relative overflow-hidden bg-gray-100 h-64">
-                    {product.images && product.images[0] ? (
-                      <Image
-                        src={product.images[0]}
-                        alt={product.name}
-                        fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                        className="object-cover group-hover:scale-110 transition-transform duration-500"
-                        unoptimized={true} // For external images
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50">
-                        <Package size={48} className="text-pink-300" />
-                      </div>
-                    )}
-                    {!product.inStock && (
-                      <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-                        Out of Stock
-                      </div>
-                    )}
-                    {product.stockQuantity < 5 && product.inStock && (
-                      <div className="absolute top-4 right-4 bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-                        Low Stock
-                      </div>
-                    )}
-                  </div>
-                </Link>
+              <div key={product._id} className="group">
+                {/* Product Card Container */}
+                <div className="bg-white rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col h-full">
+                  <Link href={`/product/${product._id}`} className="flex-shrink-0">
+                    <div className="relative overflow-hidden bg-gray-100 h-64">
+                      {product.images && product.images[0] ? (
+                        <Image
+                          src={product.images[0]}
+                          alt={product.name}
+                          fill
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                          className="object-cover group-hover:scale-110 transition-transform duration-500"
+                          unoptimized={true}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50">
+                          <Package size={48} className="text-pink-300" />
+                        </div>
+                      )}
+                      {!product.inStock && (
+                        <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                          Out of Stock
+                        </div>
+                      )}
+                      {product.stockQuantity < 5 && product.inStock && (
+                        <div className="absolute top-4 right-4 bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                          Low Stock
+                        </div>
+                      )}
+                    </div>
+                  </Link>
 
-                <div className="p-4 space-y-2">
-                  <div className="flex justify-between items-start">
-                    <h3 className="text-lg font-serif font-semibold text-gray-900 group-hover:text-pink-600 transition-colors">
-                      {product.name}
-                    </h3>
-                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-pink-100 text-pink-600 capitalize">
-                      {product.category}
-                    </span>
-                  </div>
+                  {/* Product Info Section - Updated with transparent/background color */}
+                  <div className="p-4 space-y-2 flex-grow bg-[rgb(249,210,229)]">
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-lg font-serif font-semibold text-gray-900 group-hover:text-pink-600 transition-colors">
+                        {product.name}
+                      </h3>
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-white bg-opacity-80 text-pink-600 capitalize">
+                        {product.category}
+                      </span>
+                    </div>
 
-                  <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
+                    {/* Description with same background as page */}
+                    <div className="bg-[rgb(249,210,229)]">
+                      <p className="text-sm text-gray-600 line-clamp-2 bg-transparent">
+                        {product.description}
+                      </p>
+                    </div>
 
-                  <div className="flex items-center justify-between pt-2">
-                    <span className="text-xl font-semibold text-gray-900">${product.price.toFixed(2)}</span>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault()
-                        handleAddToCart(product)
-                      }}
-                      disabled={!product.inStock}
-                      className="px-4 py-2 bg-pink-500 text-white rounded-full hover:bg-pink-600 transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={!product.inStock ? "Out of stock" : !isAuthenticated ? "Login to add to cart" : "Add to cart"}
-                    >
-                      <ShoppingBag size={16} />
-                      {product.inStock ? 'Add to Cart' : 'Out of Stock'}
-                    </button>
+                    <div className="flex items-center justify-between pt-2">
+                      <span className="text-xl font-semibold text-gray-900">${product.price.toFixed(2)}</span>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          handleAddToCart(product)
+                        }}
+                        disabled={!product.inStock}
+                        className="px-4 py-2 bg-pink-500 text-white rounded-full hover:bg-pink-600 transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={!product.inStock ? "Out of stock" : !isAuthenticated ? "Login to add to cart" : "Add to cart"}
+                      >
+                        <ShoppingBag size={16} />
+                        {product.inStock ? 'Add to Cart' : 'Out of Stock'}
+                      </button>
+                    </div>
+                    
+                    <div className="text-xs text-gray-500">
+                      <span className="font-medium">Stock:</span> {product.stockQuantity} available
+                    </div>
+                    
+                    {!isAuthenticated && product.inStock && (
+                      <p className="text-xs text-gray-500 text-center">
+                        Login to save cart items
+                      </p>
+                    )}
                   </div>
-                  
-                  <div className="text-xs text-gray-500">
-                    <span className="font-medium">Stock:</span> {product.stockQuantity} available
-                  </div>
-                  
-                  {!isAuthenticated && product.inStock && (
-                    <p className="text-xs text-gray-500 text-center">
-                      Login to save cart items
-                    </p>
-                  )}
                 </div>
               </div>
             ))}

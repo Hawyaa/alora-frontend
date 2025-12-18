@@ -99,7 +99,7 @@ export default function Contact() {
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-1">Call Us</h3>
                   <a href="tel:+1234567890" className="text-gray-600 hover:text-gray-900 text-lg">
-                    +1 (234) 567-890
+                    +251900357453
                   </a>
                   <p className="text-gray-500 text-sm">Available 9am-6pm</p>
                 </div>
