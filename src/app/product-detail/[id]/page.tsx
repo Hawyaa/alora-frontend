@@ -9,45 +9,8 @@ import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { api } from '@/lib/api'
 
-// Related product/shade data
-const relatedShades = [
-  {
-    id: 1,
-    name: "Crystal Pink",
-    description: "Shimmering pink gloss with golden flecks",
-    price: 24.99,
-    rating: 4.5,
-    image: "https://i.pinimg.com/1200x/8b/eb/2b/8beb2b9f52c0d5cc849dac9c85b6adb2.jpg",
-    color: "bg-pink-300"
-  },
-  {
-    id: 2,
-    name: "Berry Kiss",
-    description: "Rich berry tone with plum undertones",
-    price: 22.99,
-    rating: 4.8,
-    image: "https://i.pinimg.com/1200x/04/68/c9/0468c9f3f4ee6efe49591632a21cbac1.jpg",
-    color: "bg-purple-400"
-  },
-  {
-    id: 3,
-    name: "Nude Glow",
-    description: "Natural nude shade with peach undertones",
-    price: 26.99,
-    rating: 4.3,
-    image: "https://i.pinimg.com/1200x/54/54/ce/5454cea9aa5fa470cbaaf5e461ec26cd.jpg",
-    color: "bg-amber-200"
-  },
-  {
-    id: 4,
-    name: "Ruby Shine",
-    description: "Bold red gloss with cherry finish",
-    price: 23.99,
-    rating: 4.7,
-    image: "https://i.pinimg.com/736x/fe/ef/21/feef21d1f20b200362a51ad1c6926349.jpg",
-    color: "bg-red-400"
-  }
-]
+// USD to ETB conversion rate
+const USD_TO_ETB_RATE = 55;
 
 export default function ProductDetailPage() {
   const params = useParams()
@@ -62,8 +25,19 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1)
   const [selectedShade, setSelectedShade] = useState('default')
   const [relatedProducts, setRelatedProducts] = useState<any[]>([])
+  const [loadingRelated, setLoadingRelated] = useState(true)
 
   const productId = params.id as string
+
+  // Convert USD price to ETB
+  const convertToETB = (usdPrice: number): number => {
+    return Math.round(usdPrice * USD_TO_ETB_RATE)
+  }
+
+  // Format ETB price
+  const formatETB = (amount: number): string => {
+    return `ETB ${amount.toLocaleString('en-ET')}`
+  }
 
   // Fetch product details
   useEffect(() => {
@@ -71,61 +45,40 @@ export default function ProductDetailPage() {
       try {
         setLoading(true)
         
+        console.log(`Fetching product ${productId} from API...`)
+        
         // Try to fetch from API
         const data = await api.get(`/products/${productId}`)
+        console.log('Product API response:', data)
         
         if (data.success && data.product) {
-          setProduct(data.product)
+          const productData = data.product
+          console.log('Product data received:', productData)
+          
+          setProduct(productData)
+          
+          // After loading product, fetch related products
+          await fetchRelatedProducts(productData.category, productData._id)
         } else {
-          // Fallback to mock data
-          const mockProduct = relatedShades.find(p => p.id.toString() === productId) || relatedShades[0]
-          setProduct({
-            _id: mockProduct.id,
-            name: mockProduct.name,
-            description: mockProduct.description,
-            price: mockProduct.price,
-            rating: mockProduct.rating,
-            image: mockProduct.image,
-            images: [
-              mockProduct.image,
-              "https://i.pinimg.com/736x/cc/15/82/cc1582277c527faefb9d51f97e40b9af.jpg",
-              "https://i.pinimg.com/1200x/17/cf/6c/17cf6cd5bf8eb592b01391ade1e6faae.jpg"
-            ],
-            category: "Lip Gloss",
-            inStock: true,
-            stock: 50,
-            ingredients: ["Jojoba Oil", "Vitamin E", "Aloe Vera", "Natural Pigments"],
-            benefits: ["Hydrating", "Long-lasting", "Non-sticky", "Plumping effect"],
-            shadeOptions: [
-              { name: "Crystal Pink", code: "#FFB6C1" },
-              { name: "Berry Kiss", code: "#8B008B" },
-              { name: "Nude Glow", code: "#F5DEB3" },
-              { name: "Ruby Shine", code: "#DC143C" }
-            ]
-          })
+          console.log('Product not found in API, checking all products...')
+          
+          // Try to get all products and find this one
+          const allProductsResponse = await api.get('/products')
+          if (allProductsResponse.success && allProductsResponse.products) {
+            const foundProduct = allProductsResponse.products.find((p: any) => p._id === productId)
+            if (foundProduct) {
+              console.log('Found product in all products:', foundProduct)
+              setProduct(foundProduct)
+              await fetchRelatedProducts(foundProduct.category, foundProduct._id)
+            } else {
+              // Show error state
+              console.log('Product not found at all')
+            }
+          }
         }
-        
-        // Set related products (filter out current product)
-        setRelatedProducts(relatedShades.filter(p => p.id.toString() !== productId))
         
       } catch (error) {
         console.error('Error fetching product:', error)
-        // Fallback to mock data
-        const mockProduct = relatedShades[0]
-        setProduct({
-          _id: mockProduct.id,
-          name: mockProduct.name,
-          description: mockProduct.description,
-          price: mockProduct.price,
-          rating: mockProduct.rating,
-          image: mockProduct.image,
-          images: [
-            mockProduct.image,
-            "https://i.pinimg.com/736x/cc/15/82/cc1582277c527faefb9d51f97e40b9af.jpg",
-            "https://i.pinimg.com/1200x/17/cf/6c/17cf6cd5bf8eb592b01391ade1e6faae.jpg"
-          ]
-        })
-        setRelatedProducts(relatedShades.slice(1))
       } finally {
         setLoading(false)
       }
@@ -135,6 +88,33 @@ export default function ProductDetailPage() {
       fetchProduct()
     }
   }, [productId])
+
+  // Fetch related products based on category
+  const fetchRelatedProducts = async (category: string, excludeId: string) => {
+    try {
+      setLoadingRelated(true)
+      console.log(`Fetching related products for category: ${category}`)
+      
+      // Fetch all products
+      const data = await api.get('/products')
+      
+      if (data.success && data.products) {
+        // Filter products by same category, exclude current product, limit to 4
+        const filteredProducts = data.products
+          .filter((p: any) => p._id !== excludeId && p.category === category)
+          .slice(0, 4)
+        
+        console.log(`Found ${filteredProducts.length} related products`)
+        setRelatedProducts(filteredProducts)
+      } else {
+        console.log('No products found for related products')
+      }
+    } catch (error) {
+      console.error('Error fetching related products:', error)
+    } finally {
+      setLoadingRelated(false)
+    }
+  }
 
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
@@ -146,40 +126,21 @@ export default function ProductDetailPage() {
     
     try {
       const cartItem = {
+        id: product._id,
         productId: product._id,
         name: product.name,
-        price: product.price,
-        image: product.image || product.images?.[0],
+        price: product.price, // Store USD price
+        image: product.images?.[0] || product.image,
         quantity: quantity,
         description: product.description,
-        rating: product.rating,
-        shade: selectedShade
+        category: product.category,
+        shade: selectedShade !== 'default' ? selectedShade : undefined
       }
       
-      // Get existing cart from localStorage (temporary solution)
-      const existingCart = localStorage.getItem('alora-cart')
-      let cart = existingCart ? JSON.parse(existingCart) : []
-      
-      // Check if product already exists in cart
-      const existingIndex = cart.findIndex((item: any) => 
-        item.productId === cartItem.productId && item.shade === cartItem.shade
-      )
-      
-      if (existingIndex >= 0) {
-        // Update quantity if exists
-        cart[existingIndex].quantity += quantity
-      } else {
-        // Add new item
-        cart.push(cartItem)
-      }
-      
-      // Save back to localStorage
-      localStorage.setItem('alora-cart', JSON.stringify(cart))
+      // Use the CartContext to add to cart
+      addToCart(cartItem)
       
       alert(`✅ ${product.name} added to cart!`)
-      
-      // Force cart update event
-      window.dispatchEvent(new Event('storage'))
       
     } catch (error: any) {
       console.error('Add to cart error:', error)
@@ -196,12 +157,38 @@ export default function ProductDetailPage() {
           <Star
             key={star}
             size={16}
-            className={star <= Math.floor(rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
+            className={star <= Math.floor(rating || 4.5) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
           />
         ))}
-        <span className="text-sm text-gray-500 ml-1">({rating})</span>
+        <span className="text-sm text-gray-500 ml-1">({rating || 4.5})</span>
       </div>
     )
+  }
+
+  const handleQuickAddToCart = (relatedProduct: any, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!isAuthenticated) {
+      router.push('/login')
+      return
+    }
+
+    const cartItem = {
+      id: relatedProduct._id,
+      productId: relatedProduct._id,
+      name: relatedProduct.name,
+      price: relatedProduct.price,
+      image: relatedProduct.images?.[0] || relatedProduct.image,
+      quantity: 1,
+      description: relatedProduct.description,
+      category: relatedProduct.category
+    }
+    
+    // Use the CartContext to add to cart
+    addToCart(cartItem)
+    
+    alert(`✅ ${relatedProduct.name} added to cart!`)
   }
 
   if (loading) {
@@ -222,18 +209,24 @@ export default function ProductDetailPage() {
           <div className="text-4xl mb-4">😕</div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Product Not Found</h2>
           <p className="text-gray-600 mb-6">The product you're looking for doesn't exist.</p>
-          <button
-            onClick={() => router.push('/')}
-            className="bg-pink-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-pink-600 transition-colors"
+          <Link
+            href="/shop"
+            className="inline-block bg-pink-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-pink-600 transition-colors"
           >
-            Back to Home
-          </button>
+            Browse Products
+          </Link>
         </div>
       </div>
     )
   }
 
-  const productImages = product.images || [product.image]
+  const productImages = product.images && product.images.length > 0 
+    ? product.images 
+    : product.image 
+      ? [product.image] 
+      : ['https://i.pinimg.com/736x/cc/15/82/cc1582277c527faefb9d51f97e40b9af.jpg']
+
+  const productPriceETB = convertToETB(product.price || 0)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -256,14 +249,21 @@ export default function ProductDetailPage() {
           {/* Left Column - Images */}
           <div>
             {/* Main Image */}
-            <div className="relative h-96 lg:h-[500px] rounded-2xl overflow-hidden shadow-xl mb-4">
-              <Image
-                src={productImages[selectedImage]}
-                alt={product.name}
-                fill
-                className="object-cover"
-                priority
-              />
+            <div className="relative h-96 lg:h-[500px] rounded-2xl overflow-hidden shadow-xl mb-4 bg-gray-100">
+              {productImages[selectedImage] ? (
+                <Image
+                  src={productImages[selectedImage]}
+                  alt={product.name}
+                  fill
+                  className="object-cover"
+                  priority
+                  unoptimized={true}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="text-gray-400">No image available</div>
+                </div>
+              )}
               <div className="absolute top-4 right-4 flex gap-2">
                 <button className="p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors">
                   <Heart size={20} className="text-gray-700" />
@@ -281,7 +281,7 @@ export default function ProductDetailPage() {
                   <button
                     key={index}
                     onClick={() => setSelectedImage(index)}
-                    className={`relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${
+                    className={`relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all bg-gray-100 ${
                       selectedImage === index ? 'border-pink-500' : 'border-transparent'
                     }`}
                   >
@@ -290,6 +290,7 @@ export default function ProductDetailPage() {
                       alt={`${product.name} view ${index + 1}`}
                       fill
                       className="object-cover"
+                      unoptimized={true}
                     />
                   </button>
                 ))}
@@ -300,13 +301,16 @@ export default function ProductDetailPage() {
           {/* Right Column - Product Info */}
           <div className="space-y-6">
             <div>
+              <div className="inline-block px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm font-medium mb-3 capitalize">
+                {product.category || 'Lip Gloss'}
+              </div>
               <h1 className="text-3xl lg:text-4xl font-serif font-bold text-gray-900 mb-2">
                 {product.name}
               </h1>
               <div className="flex items-center justify-between mb-4">
-                <StarRating rating={product.rating || 4.5} />
+                <StarRating rating={product.rating} />
                 <span className="text-sm text-gray-500">
-                  {product.stock || 50} in stock
+                  {product.stockQuantity || product.stock || '50'} in stock
                 </span>
               </div>
               <p className="text-gray-600 text-lg leading-relaxed">
@@ -319,10 +323,13 @@ export default function ProductDetailPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-3xl font-bold text-gray-900">
-                    ${product.price?.toFixed(2) || '24.99'}
+                    {formatETB(productPriceETB)}
                   </p>
                   <p className="text-sm text-gray-500 mt-1">
-                    Free shipping on orders over $50
+                    ≈ ${(product.price || 0).toFixed(2)} USD
+                  </p>
+                  <p className="text-sm text-pink-600 mt-1">
+                    Free shipping on orders over ETB 1000
                   </p>
                 </div>
                 <div className="text-right">
@@ -340,11 +347,11 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Shade Selection */}
-            {product.shadeOptions && product.shadeOptions.length > 0 && (
+            {product.shades && product.shades.length > 0 && (
               <div>
                 <h3 className="font-semibold text-gray-900 mb-3">Select Shade</h3>
                 <div className="flex flex-wrap gap-2">
-                  {product.shadeOptions.map((shade: any, index: number) => (
+                  {product.shades.map((shade: any, index: number) => (
                     <button
                       key={index}
                       onClick={() => setSelectedShade(shade.name)}
@@ -356,7 +363,7 @@ export default function ProductDetailPage() {
                     >
                       <div
                         className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: shade.code }}
+                        style={{ backgroundColor: shade.hexCode || '#FFB6C1' }}
                       />
                       <span className="text-sm">{shade.name}</span>
                     </button>
@@ -385,7 +392,7 @@ export default function ProductDetailPage() {
                   </button>
                 </div>
                 <span className="text-gray-500">
-                  Only {product.stock || 50} items left
+                  Only {product.stockQuantity || product.stock || 50} items left
                 </span>
               </div>
             </div>
@@ -405,7 +412,7 @@ export default function ProductDetailPage() {
               <div className="text-center">
                 <Truck size={24} className="mx-auto text-gray-600 mb-2" />
                 <p className="text-sm font-medium">Free Shipping</p>
-                <p className="text-xs text-gray-500">On orders $50+</p>
+                <p className="text-xs text-gray-500">On orders ETB 1000+</p>
               </div>
               <div className="text-center">
                 <RotateCcw size={24} className="mx-auto text-gray-600 mb-2" />
@@ -423,118 +430,107 @@ export default function ProductDetailPage() {
                 <p className="text-xs text-gray-500">8+ hours wear</p>
               </div>
             </div>
-
-            {/* Product Details */}
-            {product.ingredients && (
-              <div className="pt-6 border-t">
-                <h3 className="font-semibold text-gray-900 mb-3">Key Ingredients</h3>
-                <ul className="grid grid-cols-2 gap-2">
-                  {product.ingredients.map((ingredient: string, index: number) => (
-                    <li key={index} className="flex items-center text-sm text-gray-600">
-                      <div className="w-1.5 h-1.5 bg-pink-400 rounded-full mr-2" />
-                      {ingredient}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {product.benefits && (
-              <div className="pt-6 border-t">
-                <h3 className="font-semibold text-gray-900 mb-3">Benefits</h3>
-                <ul className="space-y-2">
-                  {product.benefits.map((benefit: string, index: number) => (
-                    <li key={index} className="flex items-center text-gray-600">
-                      <div className="w-6 h-6 flex items-center justify-center mr-2">
-                        <div className="w-2 h-2 bg-pink-500 rounded-full" />
-                      </div>
-                      {benefit}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Related Products/Shades Section */}
+        {/* Related Products Section */}
         <div className="mt-16 pt-8 border-t">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="text-2xl font-serif font-bold text-gray-900">
-                Related Shades
+                Related Products
               </h2>
               <p className="text-gray-600 mt-1">
-                Explore more shades from our collection
+                Explore more products from our collection
               </p>
             </div>
             <Link
               href="/shop"
               className="text-pink-600 hover:text-pink-700 font-medium flex items-center gap-1"
             >
-              View all
+              View all products
               <ChevronRight size={16} />
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-            {relatedProducts.map((relatedProduct) => (
-              <div key={relatedProduct.id} className="group">
-                <Link href={`/product-detail/${relatedProduct.id}`}>
-                  <div className="relative h-64 rounded-xl overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 mb-4">
-                    <Image
-                      src={relatedProduct.image}
-                      alt={relatedProduct.name}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300" />
+          {loadingRelated ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
+            </div>
+          ) : relatedProducts.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-xl">
+              <p className="text-gray-600 mb-4">No related products found</p>
+              <Link
+                href="/shop"
+                className="inline-block bg-pink-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-pink-600 transition-colors"
+              >
+                Browse All Products
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              {relatedProducts.map((relatedProduct) => {
+                const relatedPriceETB = convertToETB(relatedProduct.price || 0)
+                
+                return (
+                  <div key={relatedProduct._id} className="group">
+                    <Link href={`/product-detail/${relatedProduct._id}`}>
+                      <div className="relative h-64 rounded-xl overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 mb-4 bg-gray-100">
+                        {relatedProduct.images?.[0] ? (
+                          <Image
+                            src={relatedProduct.images[0]}
+                            alt={relatedProduct.name}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-300"
+                            unoptimized={true}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <div className="text-gray-400">No image</div>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300" />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <h3 className="font-serif font-semibold text-gray-900 group-hover:text-pink-600 transition-colors line-clamp-1">
+                          {relatedProduct.name}
+                        </h3>
+                        <p className="text-gray-600 text-sm line-clamp-2">
+                          {relatedProduct.description}
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <p className="font-bold text-gray-900">
+                            {formatETB(relatedPriceETB)}
+                          </p>
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                size={12}
+                                className={star <= Math.floor(relatedProduct.rating || 4.5) 
+                                  ? "fill-yellow-400 text-yellow-400" 
+                                  : "text-gray-300"
+                                }
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => handleQuickAddToCart(relatedProduct, e)}
+                          disabled={!relatedProduct.inStock}
+                          className="w-full mt-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm flex items-center justify-center gap-2"
+                        >
+                          <ShoppingBag size={14} />
+                          Quick Add
+                        </button>
+                      </div>
+                    </Link>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <h3 className="font-serif font-semibold text-gray-900 group-hover:text-pink-600 transition-colors">
-                      {relatedProduct.name}
-                    </h3>
-                    <p className="text-gray-600 text-sm line-clamp-2">
-                      {relatedProduct.description}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <p className="font-bold text-gray-900">
-                        ${relatedProduct.price.toFixed(2)}
-                      </p>
-                      <StarRating rating={relatedProduct.rating} />
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault()
-                        // Handle quick add to cart for related product
-                        const cartItem = {
-                          productId: relatedProduct.id,
-                          name: relatedProduct.name,
-                          price: relatedProduct.price,
-                          image: relatedProduct.image,
-                          quantity: 1,
-                          description: relatedProduct.description,
-                          rating: relatedProduct.rating
-                        }
-                        
-                        const existingCart = localStorage.getItem('alora-cart')
-                        let cart = existingCart ? JSON.parse(existingCart) : []
-                        cart.push(cartItem)
-                        localStorage.setItem('alora-cart', JSON.stringify(cart))
-                        window.dispatchEvent(new Event('storage'))
-                        alert(`✅ ${relatedProduct.name} added to cart!`)
-                      }}
-                      className="w-full mt-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors text-sm flex items-center justify-center gap-2"
-                    >
-                      <ShoppingBag size={14} />
-                      Quick Add
-                    </button>
-                  </div>
-                </Link>
-              </div>
-            ))}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -324,45 +324,92 @@ export default function Home() {
   const [productsLoading, setProductsLoading] = useState(true)
 
   // Fetch real products from backend
+  // Fetch homepage products from API
+  // Fetch homepage products from API
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchHomepageProducts = async () => {
       try {
-        console.log('Fetching products from API...')
+        console.log('Fetching homepage products from API...')
         
-        const data = await api.get('/products')
-        console.log('Products API response:', data)
+        // Use the new endpoint for homepage products
+        const data = await api.get('/homepage-products');
+        console.log('Homepage products API response:', data);
         
         if (data.success && data.products && data.products.length > 0) {
-          setRealProducts(data.products)
+          // The API returns products with nested productId structure
+          // We need to check the structure and extract the product data properly
+          const formattedProducts = data.products.map((productData: any) => {
+            // Check if the product data has a nested productId structure
+            if (productData.productId && typeof productData.productId === 'object') {
+              // This is the structure from /homepage-products/admin/all
+              return {
+                _id: productData.productId._id,
+                name: productData.productId.name,
+                description: productData.productId.description,
+                price: productData.productId.price,
+                category: productData.productId.category,
+                images: productData.productId.images || [],
+                inStock: productData.productId.inStock,
+                stockQuantity: productData.productId.stockQuantity,
+                shades: productData.productId.shades || [],
+                createdAt: productData.productId.createdAt,
+                rating: 4.5 // Default rating
+              };
+            } else {
+              // This is the structure from regular /homepage-products
+              // or it's already a product object
+              return {
+                _id: productData._id,
+                name: productData.name,
+                description: productData.description,
+                price: productData.price,
+                category: productData.category,
+                images: productData.images || [],
+                inStock: productData.inStock,
+                stockQuantity: productData.stockQuantity,
+                shades: productData.shades || [],
+                createdAt: productData.createdAt,
+                rating: 4.5 // Default rating
+              };
+            }
+          });
+          
+          console.log('✅ Formatted homepage products:', formattedProducts);
+          setRealProducts(formattedProducts);
         } else {
+          // Fallback to circleImages if no homepage products
+          console.log('No homepage products found, using fallback images');
           const fallbackProducts = circleImages.map(img => ({
             _id: img.id.toString(),
             name: img.name,
             description: img.desc,
             price: parseFloat(img.price.replace('$', '')),
             rating: img.rating,
-            image: img.src
-          }))
-          setRealProducts(fallbackProducts)
+            image: img.src,
+            images: [img.src]
+          }));
+          setRealProducts(fallbackProducts);
         }
       } catch (error) {
-        console.error('Error fetching products:', error)
+        console.error('Error fetching homepage products:', error);
+        // Fallback to circleImages on error
         const fallbackProducts = circleImages.map(img => ({
           _id: img.id.toString(),
           name: img.name,
           description: img.desc,
           price: parseFloat(img.price.replace('$', '')),
           rating: img.rating,
-          image: img.src
-        }))
-        setRealProducts(fallbackProducts)
+          image: img.src,
+          images: [img.src]
+        }));
+        setRealProducts(fallbackProducts);
       } finally {
-        setProductsLoading(false)
+        setProductsLoading(false);
       }
     }
     
-    fetchProducts()
-  }, [])
+    fetchHomepageProducts();
+  }, []);
 
   const handleAddToCart = async (product: any, e: React.MouseEvent) => {
     e.preventDefault()
@@ -464,50 +511,53 @@ export default function Home() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                  {realProducts.map((product, index) => (
-                    <Link 
-                      key={product._id || product.id} 
-                      href={`/product-detail/${product._id || product.id}`}
-                      className="text-center group block"
-                    >
-                      <div className="relative h-32 sm:h-40 md:h-48 rounded-lg overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 mb-2 md:mb-3">
-                        <Image
-                          src={product.image || circleImages[index % circleImages.length]?.src}
-                          alt={product.name}
-                          fill
-                          className="object-cover group-hover:scale-110 transition-transform duration-300"
-                          sizes="(max-width: 640px) 50vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw"
-                        />
-                      </div>
-                      
-                      <div className="space-y-1 md:space-y-2 p-1 md:p-2">
-                        <h4 className="font-serif font-semibold text-black text-sm md:text-base group-hover:text-pink-600 transition-colors line-clamp-1">
-                          {product.name}
-                        </h4>
-                        
-                        <p className="text-gray-600 text-xs md:text-sm line-clamp-2">
-                          {product.description}
-                        </p>
-                        
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between">
-                          <p className="text-base md:text-lg font-bold text-black mb-1 sm:mb-0">
-                            ETB {product.price?.toFixed(2) || '24.99'}
-                          </p>
-                          <StarRating rating={product.rating || 4.5} />
-                        </div>
-                        
-                        {/* <button
-                          onClick={(e) => handleAddToCart(product, e)}
-                          disabled={addingProductId === product._id}
-                          className="w-full bg-gradient-to-r from-rose-400 to-pink-500 text-white py-1.5 md:py-2 px-3 md:px-4 rounded-full font-semibold hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <ShoppingBag size={12} className="md:w-4 md:h-4" />
-                          {addingProductId === product._id ? 'Adding...' : 'Add to Cart'}
-                        </button> */}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+  {realProducts.map((product, index) => {
+    // Convert USD price to ETB
+    const productPriceETB = product.price ? Math.round(product.price * 55) : 0;
+    
+    return (
+      <Link 
+        key={product._id || product.id} 
+        href={`/product-detail/${product._id || product.id}`}
+        className="text-center group block"
+      >
+        <div className="relative h-32 sm:h-40 md:h-48 rounded-lg overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 mb-2 md:mb-3">
+          <Image
+            src={product.images?.[0] || product.image || circleImages[index % circleImages.length]?.src}
+            alt={product.name}
+            fill
+            className="object-cover group-hover:scale-110 transition-transform duration-300"
+            sizes="(max-width: 640px) 50vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw"
+          />
+        </div>
+        
+        <div className="space-y-1 md:space-y-2 p-1 md:p-2">
+          <h4 className="font-serif font-semibold text-black text-sm md:text-base group-hover:text-pink-600 transition-colors line-clamp-1">
+            {product.name}
+          </h4>
+          
+          <p className="text-gray-600 text-xs md:text-sm line-clamp-2">
+            {product.description}
+          </p>
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+            <p className="text-base md:text-lg font-bold text-black mb-1 sm:mb-0">
+              ETB {productPriceETB.toFixed(2)}
+            </p>
+            <StarRating rating={product.rating || 4.5} />
+          </div>
+          
+          {/* Optional: Show stock status */}
+          {product.inStock !== undefined && (
+            <div className="text-xs text-gray-500">
+              {product.inStock ? 'In Stock' : 'Out of Stock'}
+            </div>
+          )}
+        </div>
+      </Link>
+    );
+  })}
+</div>
               )}
             </div>
           </div>

@@ -10,7 +10,9 @@ import {
   AlertCircle, User, Copy, MessageSquare,
   Home, ShoppingCart, Settings, LogOut,
   Plus, Edit, Trash2, Search, Upload,
-  BarChart3, Layers, Tag, Image as ImageIcon
+  BarChart3, Layers, Tag, Image as ImageIcon,
+  Star, Grid, List, ArrowUp, ArrowDown,
+  EyeOff, RefreshCw, X
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -58,6 +60,18 @@ interface Product {
   updatedAt: string;
 }
 
+interface HomepageProduct {
+  _id: string;
+  productId: Product;
+  position: number;
+  isActive: boolean;
+  addedBy?: {
+    name: string;
+    email: string;
+  };
+  createdAt: string;
+}
+
 interface Stats {
   totalOrders: number;
   totalRevenue: number; // This is in USD from backend
@@ -76,7 +90,7 @@ interface Stats {
 }
 
 interface AdminTab {
-  id: 'dashboard' | 'orders' | 'products' | 'customers';
+  id: 'dashboard' | 'orders' | 'products' | 'homepage' | 'customers';
   label: string;
   icon: React.ReactNode;
 }
@@ -86,9 +100,10 @@ const USD_TO_ETB_RATE = 55;
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'customers'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'homepage' | 'customers'>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [homepageProducts, setHomepageProducts] = useState<HomepageProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({
     totalOrders: 0,
@@ -119,6 +134,11 @@ export default function AdminDashboard() {
   });
   const [newShade, setNewShade] = useState({ name: '', hexCode: '#ff69b4' });
 
+  // Homepage Management States
+  const [showAddHomepageModal, setShowAddHomepageModal] = useState(false);
+  const [homepageSearchTerm, setHomepageSearchTerm] = useState('');
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
   // Conversion functions
@@ -146,6 +166,7 @@ export default function AdminDashboard() {
     { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 size={20} /> },
     { id: 'orders', label: 'Orders', icon: <ShoppingBag size={20} /> },
     { id: 'products', label: 'Products', icon: <Package size={20} /> },
+    { id: 'homepage', label: 'Homepage', icon: <Home size={20} /> },
     { id: 'customers', label: 'Customers', icon: <Users size={20} /> },
   ];
 
@@ -157,6 +178,8 @@ export default function AdminDashboard() {
     } else if (activeTab === 'products') {
       fetchProducts();
       fetchProductStats();
+    } else if (activeTab === 'homepage') {
+      fetchHomepageProducts();
     } else if (activeTab === 'dashboard') {
       fetchStats();
       fetchOrders();
@@ -288,6 +311,56 @@ export default function AdminDashboard() {
     } catch (error: any) {
       console.error('Error fetching products:', error.message);
       setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchHomepageProducts = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('alora-token');
+      
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+      
+      // First fetch all products to calculate available ones
+      const productsResponse = await fetch(`${API_URL}/admin/products`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (productsResponse.ok) {
+        const productsData = await productsResponse.json();
+        if (productsData.success) {
+          setProducts(productsData.products || []);
+        }
+      }
+      
+      // Then fetch homepage products
+      const response = await fetch(`${API_URL}/homepage-products/admin/all`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!response.ok) {
+        console.error('HTTP error fetching homepage products:', response.status);
+        setHomepageProducts([]);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('🏠 Homepage products data received:', data);
+      
+      if (data && data.success) {
+        setHomepageProducts(data.homepageProducts || []);
+      } else {
+        console.error('Failed to fetch homepage products:', data?.message || 'No data returned');
+        setHomepageProducts([]);
+      }
+    } catch (error: any) {
+      console.error('Error fetching homepage products:', error.message);
+      setHomepageProducts([]);
     } finally {
       setLoading(false);
     }
@@ -515,6 +588,116 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error deleting product:', error);
       alert('Error deleting product. Please try again.');
+    }
+  };
+
+  const handleAddToHomepage = async (productId: string) => {
+    try {
+      const token = localStorage.getItem('alora-token');
+      
+      if (!token) {
+        alert('Please login first');
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/homepage-products`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          productId,
+          position: homepageProducts.length
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('Product added to homepage!');
+        fetchHomepageProducts();
+      } else {
+        alert(data.error || 'Failed to add product');
+      }
+    } catch (error) {
+      console.error('Error adding product to homepage:', error);
+      alert('Failed to add product to homepage');
+    }
+  };
+
+  const handleRemoveFromHomepage = async (productId: string) => {
+    if (!confirm('Remove this product from homepage?')) return;
+    
+    try {
+      const token = localStorage.getItem('alora-token');
+      
+      const response = await fetch(`${API_URL}/homepage-products/${productId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('Product removed from homepage!');
+        fetchHomepageProducts();
+      } else {
+        alert(data.error || 'Failed to remove product');
+      }
+    } catch (error) {
+      console.error('Error removing product from homepage:', error);
+      alert('Failed to remove product from homepage');
+    }
+  };
+
+  const handleToggleHomepageActive = async (homepageProductId: string) => {
+    try {
+      const token = localStorage.getItem('alora-token');
+      
+      const response = await fetch(`${API_URL}/homepage-products/${homepageProductId}/toggle`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        fetchHomepageProducts();
+      }
+    } catch (error) {
+      console.error('Error toggling product status:', error);
+    }
+  };
+
+  const handleMoveHomepagePosition = async (homepageProductId: string, direction: 'up' | 'down') => {
+    const product = homepageProducts.find(hp => hp._id === homepageProductId);
+    if (!product) return;
+    
+    const newPosition = direction === 'up' ? product.position - 1 : product.position + 1;
+    
+    try {
+      const token = localStorage.getItem('alora-token');
+      
+      const response = await fetch(`${API_URL}/homepage-products/${homepageProductId}/position`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ position: newPosition })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        fetchHomepageProducts();
+      }
+    } catch (error) {
+      console.error('Error moving product position:', error);
     }
   };
 
@@ -747,21 +930,21 @@ export default function AdminDashboard() {
               </div>
             </div>
           </button>
-          
-          <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Total Customers</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalCustomers}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {stats.ordersWithCustomers ? `${stats.ordersWithCustomers} orders placed` : 'No orders yet'}
-                </p>
-              </div>
+
+          <button
+            onClick={() => setActiveTab('homepage')}
+            className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow text-left"
+          >
+            <div className="flex items-center gap-4">
               <div className="bg-purple-50 p-3 rounded-lg">
-                <Users className="text-purple-600" size={24} />
+                <Home className="text-purple-600" size={24} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Manage Homepage</h3>
+                <p className="text-sm text-gray-600">Setup featured products</p>
               </div>
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Recent Orders */}
@@ -1169,6 +1352,275 @@ export default function AdminDashboard() {
     </div>
   );
 
+  const renderHomepage = () => {
+    // Sort homepage products by position
+    const sortedHomepageProducts = [...homepageProducts].sort((a, b) => a.position - b.position);
+    
+    // Calculate available products (products not already on homepage)
+    const homepageProductIds = new Set(homepageProducts.map(hp => hp.productId._id));
+    const filteredAvailableProducts = products.filter(product => 
+      !homepageProductIds.has(product._id) &&
+      (homepageSearchTerm === '' || 
+       product.name.toLowerCase().includes(homepageSearchTerm.toLowerCase()) ||
+       product.description.toLowerCase().includes(homepageSearchTerm.toLowerCase()))
+    );
+
+    return (
+      <div className="space-y-6">
+        {/* Homepage Header */}
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Homepage Product Management</h2>
+              <p className="text-gray-600 mt-1">
+                Manage which products appear on the homepage's "Premium Lip Gloss Collection" section
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Back to Dashboard
+              </button>
+              <button
+                onClick={() => setShowAddHomepageModal(true)}
+                className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 flex items-center gap-2"
+              >
+                <Plus size={20} />
+                Add Products
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Current Homepage Products */}
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div className="p-6 border-b">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Home size={20} />
+              Current Homepage Products ({sortedHomepageProducts.length})
+            </h3>
+            <p className="text-gray-600 text-sm mt-1">
+              These products appear on the homepage. Drag or use arrows to reorder.
+            </p>
+          </div>
+
+          {sortedHomepageProducts.length === 0 ? (
+            <div className="text-center py-12">
+              <Package size={64} className="mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Homepage Products</h3>
+              <p className="text-gray-600 mb-6">Add products to display on the homepage</p>
+              <button
+                onClick={() => setShowAddHomepageModal(true)}
+                className="px-6 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 flex items-center gap-2 mx-auto"
+              >
+                <Plus size={20} />
+                Add Products
+              </button>
+            </div>
+          ) : (
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {sortedHomepageProducts.map((hp, index) => (
+                  <div key={hp._id} className="border rounded-lg overflow-hidden group">
+                    <div className="relative">
+                      <div className="h-48 bg-gray-100 overflow-hidden">
+                        {hp.productId.images?.[0] ? (
+                          <img
+                            src={hp.productId.images[0]}
+                            alt={hp.productId.name}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Package size={48} className="text-gray-300" />
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Position Badge */}
+                      <div className="absolute top-2 left-2 bg-pink-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                        #{index + 1}
+                      </div>
+                      
+                      {/* Status Badge */}
+                      <div className="absolute top-2 right-2">
+                        <button
+                          onClick={() => handleToggleHomepageActive(hp._id)}
+                          className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
+                            hp.isActive 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {hp.isActive ? <Eye size={12} /> : <EyeOff size={12} />}
+                          {hp.isActive ? 'Active' : 'Hidden'}
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-semibold text-gray-900 line-clamp-1">
+                          {hp.productId.name}
+                        </h4>
+                        <span className="text-pink-600 font-bold">
+                          {formatETB(convertToETB(hp.productId.price))}
+                        </span>
+                      </div>
+                      
+                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                        {hp.productId.description}
+                      </p>
+                      
+                      <div className="flex items-center justify-between text-sm text-gray-500">
+                        <span className="capitalize">{hp.productId.category}</span>
+                        <span>Stock: {hp.productId.stockQuantity}</span>
+                      </div>
+                      
+                      <div className="flex gap-2 mt-4">
+                        <div className="flex-1 flex gap-1">
+                          <button
+                            onClick={() => handleMoveHomepagePosition(hp._id, 'up')}
+                            disabled={index === 0}
+                            className={`flex-1 px-2 py-1 rounded ${
+                              index === 0
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            <ArrowUp size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleMoveHomepagePosition(hp._id, 'down')}
+                            disabled={index === sortedHomepageProducts.length - 1}
+                            className={`flex-1 px-2 py-1 rounded ${
+                              index === sortedHomepageProducts.length - 1
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            <ArrowDown size={16} />
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveFromHomepage(hp.productId._id)}
+                          className="px-3 py-1 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 text-sm"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                      
+                      <div className="text-xs text-gray-500 mt-2">
+                        Added: {new Date(hp.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Add Products Modal */}
+        {showAddHomepageModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    Add Products to Homepage
+                  </h3>
+                  <button
+                    onClick={() => setShowAddHomepageModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="mb-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                    <input
+                      type="text"
+                      placeholder="Search products..."
+                      value={homepageSearchTerm}
+                      onChange={(e) => setHomepageSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredAvailableProducts.map((product) => (
+                    <div key={product._id} className="border rounded-lg overflow-hidden group">
+                      <div className="h-40 bg-gray-100 overflow-hidden">
+                        {product.images?.[0] ? (
+                          <img
+                            src={product.images[0]}
+                            alt={product.name}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Package size={32} className="text-gray-300" />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="p-3">
+                        <h4 className="font-semibold text-gray-900 text-sm line-clamp-1 mb-1">
+                          {product.name}
+                        </h4>
+                        <p className="text-xs text-gray-600 line-clamp-2 mb-2">
+                          {product.description}
+                        </p>
+                        <div className="flex justify-between items-center">
+                          <span className="text-pink-600 font-bold text-sm">
+                            {formatETB(convertToETB(product.price))}
+                          </span>
+                          <button
+                            onClick={() => handleAddToHomepage(product._id)}
+                            className="px-3 py-1 bg-pink-500 text-white rounded-lg hover:bg-pink-600 text-sm flex items-center gap-1"
+                          >
+                            <Plus size={12} />
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {filteredAvailableProducts.length === 0 && (
+                  <div className="text-center py-8">
+                    <Package size={48} className="mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-600">
+                      {homepageSearchTerm 
+                        ? 'No products match your search'
+                        : 'All products are already on the homepage'}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-6 mt-6 border-t">
+                  <button
+                    onClick={() => setShowAddHomepageModal(false)}
+                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderCustomers = () => {
     // Calculate customer value in ETB
     const customerValueETB = stats.totalCustomers > 0 
@@ -1239,36 +1691,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
-              <p className="text-gray-600">Alora Lipgloss Store Management</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => window.open('/', '_blank')}
-                className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2"
-              >
-                <Home size={20} />
-                View Store
-              </button>
-              <button
-                onClick={() => {
-                  localStorage.removeItem('alora-token');
-                  localStorage.removeItem('alora-user');
-                  router.push('/login');
-                }}
-                className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2"
-              >
-                <LogOut size={20} />
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+     
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Navigation Tabs */}
@@ -1295,6 +1718,7 @@ export default function AdminDashboard() {
         {activeTab === 'dashboard' && renderDashboard()}
         {activeTab === 'orders' && renderOrders()}
         {activeTab === 'products' && renderProducts()}
+        {activeTab === 'homepage' && renderHomepage()}
         {activeTab === 'customers' && renderCustomers()}
       </div>
 

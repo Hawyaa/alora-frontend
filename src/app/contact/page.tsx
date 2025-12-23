@@ -185,7 +185,7 @@ export default function Contact() {
 
               <button
                 type="submit"
-                className="w-full bg-pink-500 text-white py-3 px-6 rounded-lg font-semibold hover:bg-pink-600 transition-colors duration-200 flex items-center justify-center gap-2"
+                className="w-full bg-gradient-to-r from-rose-400 to-pink-500 text-white py-3 px-6 rounded-lg font-semibold hover:bg-pink-600 transition-colors duration-200 flex items-center justify-center gap-2"
               >
                 <Send size={20} />
                 Send Message

@@ -38,7 +38,7 @@ export default function LoginPage() {
           // Temporarily disabled - fix CartContext signature first
           // addToCart(cartItem);
           
-          alert(`✅ ${product.name || 'Item'} would be added to your cart!`);
+          // alert(`✅ ${product.name || 'Item'} would be added to your cart!`);
           localStorage.removeItem('pending-cart-item');
         } catch (error) {
           console.error('Error restoring cart item:', error);
@@ -122,7 +122,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-pink-500 text-white py-3 rounded-lg font-medium hover:bg-pink-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-gradient-to-r from-rose-400 to-pink-500 text-white py-3 rounded-lg font-medium hover:bg-pink-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Signing in...' : 'Sign In'}
           </button>

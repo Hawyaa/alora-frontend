@@ -21,7 +21,8 @@ export default function AdminTest() {
   return (
     <button 
       onClick={checkAdmin}
-      className="fixed bottom-4 right-4 bg-purple-500 text-white p-3 rounded-full shadow-lg z-50"
+      className="fixed bottom-4 right-4 bg-gradient-to-r from-rose-400 to-pink-500 text-white p-3 rounded-full shadow-lg z-50"
+       
       title="Check Admin Status"
     >
       👑

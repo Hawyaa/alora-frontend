@@ -1,4 +1,3 @@
-// app/shop/page.tsx
 'use client'
 
 import { useState, useEffect } from "react"
@@ -221,7 +220,7 @@ export default function Shop() {
           <p className="text-gray-600 mb-4">{error}</p>
           <button
             onClick={fetchProducts}
-            className="bg-pink-500 text-white px-6 py-2 rounded-lg hover:bg-pink-600"
+            className="bg-gradient-to-r from-rose-400 to-pink-500 text-white px-6 py-3 rounded-full font-semibold hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl text-sm md:text-base"
           >
             Try Again
           </button>
@@ -233,14 +232,7 @@ export default function Shop() {
   return (
     <div className="min-h-screen bg-[rgb(249,210,229)] relative">
       {/* Success Notification */}
-      {showSuccess && addedProduct && (
-        <div className="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in-down">
-          <div className="flex items-center gap-2">
-            <ShoppingBag size={16} />
-            <span className="font-medium">{addedProduct} added to cart!</span>
-          </div>
-        </div>
-      )}
+      
 
       {/* Mobile Back Button */}
       <div className="lg:hidden bg-white border-b">
@@ -264,9 +256,6 @@ export default function Shop() {
           <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto">
             Explore our premium beauty products designed for radiant, luminous lips
           </p>
-          <div className="mt-4 text-sm text-pink-600 bg-pink-50 inline-block px-3 py-1 rounded-full">
-            All prices in Ethiopian Birr (ETB)
-          </div>
         </div>
       </div>
 
@@ -313,7 +302,7 @@ export default function Shop() {
                   onClick={() => setViewMode('grid')}
                   className={`flex-1 px-4 py-2 rounded-lg flex items-center justify-center gap-2 ${
                     viewMode === 'grid' 
-                      ? 'bg-pink-500 text-white' 
+                      ? 'bg-gradient-to-r from-rose-400 to-pink-500 text-white' 
                       : 'bg-gray-100 text-gray-700'
                   }`}
                 >
@@ -324,7 +313,7 @@ export default function Shop() {
                   onClick={() => setViewMode('list')}
                   className={`flex-1 px-4 py-2 rounded-lg flex items-center justify-center gap-2 ${
                     viewMode === 'list' 
-                      ? 'bg-pink-500 text-white' 
+                      ? 'bg-gradient-to-r from-rose-400 to-pink-500 text-white' 
                       : 'bg-gray-100 text-gray-700'
                   }`}
                 >
@@ -349,15 +338,15 @@ export default function Shop() {
               <div className="flex bg-gray-100 rounded-lg p-1">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white shadow' : ''}`}
+                  className={`p-2 rounded ${viewMode === 'grid' ? 'bg-gradient-to-r from-rose-400 to-pink-500 text-white shadow' : ''}`}
                 >
-                  <Grid size={18} className={viewMode === 'grid' ? 'text-pink-500' : 'text-gray-500'} />
+                  <Grid size={18} className={viewMode === 'grid' ? 'text-white' : 'text-gray-500'} />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-2 rounded ${viewMode === 'list' ? 'bg-white shadow' : ''}`}
+                  className={`p-2 rounded ${viewMode === 'list' ? 'bg-gradient-to-r from-rose-400 to-pink-500 text-white shadow' : ''}`}
                 >
-                  <List size={18} className={viewMode === 'list' ? 'text-pink-500' : 'text-gray-500'} />
+                  <List size={18} className={viewMode === 'list' ? 'text-white' : 'text-gray-500'} />
                 </button>
               </div>
             </div>
@@ -391,7 +380,7 @@ export default function Shop() {
             <p className="text-gray-600 mb-4">Add products through the admin dashboard to get started</p>
             <button
               onClick={fetchProducts}
-              className="bg-pink-500 text-white px-6 py-2 rounded-lg hover:bg-pink-600"
+              className="bg-gradient-to-r from-rose-400 to-pink-500 text-white px-6 py-3 rounded-full font-semibold hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl text-sm md:text-base"
             >
               Refresh Products
             </button>
@@ -468,7 +457,7 @@ export default function Shop() {
                             handleAddToCart(product)
                           }}
                           disabled={!product.inStock}
-                          className="px-3 py-1.5 md:px-4 md:py-2 bg-pink-500 text-white rounded-full hover:bg-pink-600 transition-colors text-xs md:text-sm font-medium flex items-center gap-1 md:gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-3 py-1.5 md:px-4 md:py-2 bg-gradient-to-r from-rose-400 to-pink-500 text-white rounded-full hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl text-xs md:text-sm font-medium flex items-center gap-1 md:gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                           title={!product.inStock ? "Out of stock" : !isAuthenticated ? "Login to add to cart" : "Add to cart"}
                         >
                           <ShoppingBag size={14} className="md:w-4 md:h-4" />
@@ -570,11 +559,12 @@ export default function Shop() {
                               handleAddToCart(product)
                             }}
                             disabled={!product.inStock}
-                            className="px-6 py-2 bg-pink-500 text-white rounded-full hover:bg-pink-600 transition-colors text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                            className="px-6 py-2 bg-gradient-to-r from-rose-400 to-pink-500 text-white rounded-full hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                           >
                             <ShoppingBag size={16} />
                             {product.inStock ? 'Add to Cart' : 'Out of Stock'}
                           </button>
+                          
                         </div>
                       </div>
                     </div>
@@ -640,7 +630,7 @@ export default function Shop() {
             <div className="flex flex-col gap-2 md:gap-3">
               <button
                 onClick={handleLoginAndAdd}
-                className="w-full bg-pink-500 text-white py-2 md:py-3 rounded-lg font-medium hover:bg-pink-600 transition-colors flex items-center justify-center gap-2 text-sm md:text-base"
+                className="w-full bg-gradient-to-r from-rose-400 to-pink-500 text-white py-2 md:py-3 rounded-full font-semibold hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-sm md:text-base"
               >
                 <LogIn size={16} />
                 Login & Add to Cart

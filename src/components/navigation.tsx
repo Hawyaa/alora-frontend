@@ -90,17 +90,7 @@ export default function Navigation() {
           >
             Contact
           </Link>
-          
-          {/* Debug Button (Only in development) */}
-          {process.env.NODE_ENV === 'development' && (
-            <button
-              onClick={debugCartStorage}
-              className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded"
-              title="Debug Cart"
-            >
-              🐛 Debug
-            </button>
-          )}
+         
         </div>
 
         {/* Mobile Header */}
