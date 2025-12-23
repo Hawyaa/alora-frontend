@@ -1,6 +1,8 @@
-"use client"
+// contexts/AuthContext.tsx
+'use client'
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface User {
   id?: string
@@ -19,6 +21,7 @@ interface AuthContextType {
   logout: () => void
   register: (userData: any) => Promise<{success: boolean; user?: any; error?: string}>
   clearUserCart: () => void
+  refreshAuth: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -28,29 +31,96 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
+
+  const refreshAuth = () => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const savedToken = localStorage.getItem('alora-token')
+      const savedUser = localStorage.getItem('alora-user')
+      
+      if (savedToken && savedUser) {
+        setToken(savedToken)
+        setUser(JSON.parse(savedUser))
+        setIsAuthenticated(true)
+        console.log('🔄 Auth refreshed for:', JSON.parse(savedUser).email)
+      } else {
+        setToken(null)
+        setUser(null)
+        setIsAuthenticated(false)
+      }
+    } catch (error) {
+      console.error('Error refreshing auth:', error)
+      setToken(null)
+      setUser(null)
+      setIsAuthenticated(false)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedToken = localStorage.getItem('alora-token')
-        const savedUser = localStorage.getItem('alora-user')
-        
-        if (savedToken && savedUser) {
-          setToken(savedToken)
-          setUser(JSON.parse(savedUser))
-          setIsAuthenticated(true)
-        }
-      } catch (error) {
-        console.error('Error loading auth data:', error)
-      } finally {
-        setIsLoading(false)
+    refreshAuth()
+    
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'alora-token' || e.key === 'alora-user') {
+        console.log('🔄 Auth storage changed:', e.key)
+        refreshAuth()
       }
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
     }
   }, [])
 
+  const clearUserCart = () => {
+    if (typeof window !== 'undefined') {
+      // Get current user ID before clearing
+      const currentUser = localStorage.getItem('alora-user');
+      let currentUserId = 'guest';
+      
+      if (currentUser) {
+        try {
+          const userData = JSON.parse(currentUser);
+          currentUserId = userData.id || userData.email || 'user';
+        } catch (error) {
+          console.error('Error parsing user data:', error);
+        }
+      }
+      
+      const currentCartKey = `alora-cart-${currentUserId}`;
+      
+      // Remove ALL cart keys except current user's
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('alora-cart-')) {
+          // Only remove if it's NOT the current user's cart
+          if (key !== currentCartKey) {
+            localStorage.removeItem(key);
+            console.log('🗑️ Cleared old user cart:', key);
+          }
+        }
+      }
+      
+      // Clear legacy cart
+      localStorage.removeItem('alora-cart');
+      
+      // Clear any pending items
+      localStorage.removeItem('pending-cart-item');
+      localStorage.removeItem('pending-cart-items');
+    }
+  }
+
   const login = async (email: string, password: string) => {
     try {
-      console.log('Attempting login for:', email);
+      console.log('🔐 Attempting login for:', email);
+      
+      // Clean up ALL old carts before login
+      clearUserCart();
       
       const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
@@ -59,28 +129,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       
       const data = await response.json();
-      console.log('Login response:', data);
       
-      // Check for errors - but DON'T throw generic Error
       if (!response.ok || !data.success) {
-        // Return error object instead of throwing
         return { 
           success: false, 
           error: data.error || data.message || 'Invalid email or password' 
         };
       }
       
-      // Clear any guest cart before setting new user
-      clearUserCart();
-      
+      // Set new auth state
       setToken(data.token);
       setUser(data.user);
       setIsAuthenticated(true);
       localStorage.setItem('alora-token', data.token);
       localStorage.setItem('alora-user', JSON.stringify(data.user));
       
-      // Load user's cart from backend if available
+      console.log('✅ Login successful for:', email);
+      
+      // Load user's cart from backend
       await loadUserCart(data.token);
+      
+      // Dispatch storage event
+      window.dispatchEvent(new Event('storage'));
       
       return { 
         success: true, 
@@ -89,15 +159,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       
     } catch (error: any) {
-      console.error('Login error:', error);
-      // For network errors, still throw
+      console.error('💥 Login error:', error);
       throw error;
     }
   };
 
   const register = async (userData: any) => {
     try {
-      console.log('Registering user data:', userData)
+      console.log('📝 Registering user:', userData.email)
+      
+      // Clean up old carts before registration
+      clearUserCart();
       
       const response = await fetch('http://localhost:5000/api/auth/register', {
         method: 'POST',
@@ -106,9 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       
       const data = await response.json()
-      console.log('Registration response:', data)
       
-      // FIXED: Don't throw error, just return it
       if (!response.ok || !data.success) {
         return { 
           success: false, 
@@ -116,12 +186,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
       
-      // If registration successful, also login the user
+      // Set new auth state
       setToken(data.token)
       setUser(data.user)
       setIsAuthenticated(true)
       localStorage.setItem('alora-token', data.token)
       localStorage.setItem('alora-user', JSON.stringify(data.user))
+      
+      console.log('✅ Registration successful for:', userData.email);
+      
+      // Load user's cart from backend
+      await loadUserCart(data.token);
+      
+      // Dispatch storage event
+      window.dispatchEvent(new Event('storage'));
       
       return { 
         success: true, 
@@ -130,7 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
     } catch (error: any) {
-      console.error('Registration error:', error)
+      console.error('💥 Registration error:', error)
       return { 
         success: false, 
         error: 'Network error. Please check your connection.' 
@@ -138,21 +216,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const logout = () => {
-    // Clear cart for this user
-    clearUserCart()
+ // contexts/AuthContext.tsx - UPDATE logout function
+const logout = () => {
+  console.log('🚪 Logging out user:', user?.email);
+  
+  // Get current user info before clearing
+  const currentUserEmail = user?.email || 'unknown';
+  
+  // Clear ALL cart storage for the current user
+  if (typeof window !== 'undefined') {
+    // Clear current user's specific cart
+    if (user?.email) {
+      const userCartKey = `alora-cart-${user.email}`;
+      localStorage.removeItem(userCartKey);
+      console.log(`🗑️ Removed cart for user: ${user.email}`);
+    }
     
-    setToken(null)
-    setUser(null)
-    setIsAuthenticated(false)
-    localStorage.removeItem('alora-token')
-    localStorage.removeItem('alora-user')
-    localStorage.removeItem('alora-cart')
+    // Clear all possible cart storage
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('alora-cart-')) {
+        localStorage.removeItem(key);
+      }
+    }
+    
+    // Clear legacy cart
+    localStorage.removeItem('alora-cart');
+    
+    // Clear auth storage
+    localStorage.removeItem('alora-token');
+    localStorage.removeItem('alora-user');
+    
+    // Clear any pending items
+    localStorage.removeItem('pending-cart-item');
+    localStorage.removeItem('pending-cart-items');
   }
+  
+  // Clear auth state
+  setToken(null);
+  setUser(null);
+  setIsAuthenticated(false);
+  
+  console.log('✅ User logged out successfully:', currentUserEmail);
+  
+  // Dispatch storage event to trigger CartContext update
+  window.dispatchEvent(new Event('storage'));
+  
+  // Redirect to home
+  router.push('/');
+};
 
-  // Load user's cart from backend
   const loadUserCart = async (userToken: string) => {
     try {
+      console.log('🔄 Loading user cart from backend...');
       const response = await fetch('http://localhost:5000/api/cart', {
         headers: {
           'Authorization': `Bearer ${userToken}`
@@ -161,20 +277,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (response.ok) {
         const cartData = await response.json()
-        // Save to localStorage or context
         if (cartData.items && cartData.items.length > 0) {
-          localStorage.setItem('alora-cart', JSON.stringify(cartData.items))
+          const user = localStorage.getItem('alora-user');
+          if (user) {
+            try {
+              const userData = JSON.parse(user);
+              const userCartKey = `alora-cart-${userData.id || userData.email || 'user'}`;
+              localStorage.setItem(userCartKey, JSON.stringify(cartData.items));
+              console.log(`✅ Loaded ${cartData.items.length} items to ${userCartKey}`);
+            } catch (error) {
+              console.error('Error saving user cart:', error);
+            }
+          }
+        } else {
+          console.log('🛒 User has no cart items on backend');
         }
+      } else {
+        console.log('⚠️ Could not load user cart from backend');
       }
     } catch (error) {
       console.error('Error loading user cart:', error)
-    }
-  }
-
-  // Clear cart data for current user
-  const clearUserCart = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('alora-cart')
     }
   }
 
@@ -187,7 +309,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       register,
-      clearUserCart
+      clearUserCart,
+      refreshAuth
     }}>
       {children}
     </AuthContext.Provider>

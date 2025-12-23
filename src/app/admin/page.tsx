@@ -17,7 +17,7 @@ import Link from 'next/link';
 interface OrderItem {
   name: string;
   quantity: number;
-  price: number;
+  price: number; // This is in USD from backend
   shade?: string;
   total?: number;
 }
@@ -25,7 +25,7 @@ interface OrderItem {
 interface Order {
   _id: string;
   orderNumber?: string;
-  totalAmount?: number;
+  totalAmount?: number; // This is in USD from backend
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   paymentMethod?: 'cash' | 'online';
   createdAt: string;
@@ -48,7 +48,7 @@ interface Product {
   _id: string;
   name: string;
   description: string;
-  price: number;
+  price: number; // This is in USD from backend
   category: string;
   images: string[];
   inStock: boolean;
@@ -60,7 +60,7 @@ interface Product {
 
 interface Stats {
   totalOrders: number;
-  totalRevenue: number;
+  totalRevenue: number; // This is in USD from backend
   pendingOrders: number;
   completedOrders: number;
   cancelledOrders: number;
@@ -68,7 +68,7 @@ interface Stats {
   totalCustomers: number;
   totalProducts: number;
   lowStockProducts: number;
-  ordersWithCustomers?: number; // Add this line
+  ordersWithCustomers?: number;
   chartData?: {
     labels: string[];
     data: number[];
@@ -80,6 +80,9 @@ interface AdminTab {
   label: string;
   icon: React.ReactNode;
 }
+
+// USD to ETB conversion rate (same as shop page)
+const USD_TO_ETB_RATE = 55;
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -107,7 +110,7 @@ export default function AdminDashboard() {
   const [newProduct, setNewProduct] = useState({
     name: '',
     description: '',
-    price: '',
+    price: '', // This is in ETB in the form
     category: 'lipgloss',
     images: [''],
     inStock: true,
@@ -117,6 +120,27 @@ export default function AdminDashboard() {
   const [newShade, setNewShade] = useState({ name: '', hexCode: '#ff69b4' });
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+  // Conversion functions
+  const convertToETB = (usdPrice: number): number => {
+    return Math.round(usdPrice * USD_TO_ETB_RATE);
+  };
+
+  const convertToUSD = (etbPrice: number): number => {
+    return etbPrice / USD_TO_ETB_RATE;
+  };
+
+  const formatETB = (amount: number): string => {
+    return `ETB ${amount.toLocaleString('en-ET')}`;
+  };
+
+  const formatCurrency = (amount: number, inETB: boolean = true): string => {
+    if (inETB) {
+      const etbAmount = convertToETB(amount);
+      return formatETB(etbAmount);
+    }
+    return `$${amount.toFixed(2)}`;
+  };
 
   const adminTabs: AdminTab[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 size={20} /> },
@@ -374,9 +398,13 @@ export default function AdminDashboard() {
         return;
       }
 
+      // Convert ETB price to USD for storage
+      const etbPrice = parseFloat(newProduct.price);
+      const usdPrice = convertToUSD(etbPrice);
+
       const productData = {
         ...newProduct,
-        price: parseFloat(newProduct.price),
+        price: usdPrice, // Store as USD in database
         stockQuantity: parseInt(newProduct.stockQuantity) || 0,
         images: newProduct.images.filter(img => img.trim() !== '')
       };
@@ -418,9 +446,13 @@ export default function AdminDashboard() {
         return;
       }
 
+      // Convert ETB price to USD for storage
+      const etbPrice = parseFloat(newProduct.price);
+      const usdPrice = convertToUSD(etbPrice);
+
       const productData = {
         ...newProduct,
-        price: parseFloat(newProduct.price),
+        price: usdPrice, // Store as USD in database
         stockQuantity: parseInt(newProduct.stockQuantity) || 0,
         images: newProduct.images.filter(img => img.trim() !== '')
       };
@@ -488,10 +520,13 @@ export default function AdminDashboard() {
 
   const editProduct = (product: Product) => {
     setEditingProduct(product);
+    // Convert USD price from database to ETB for the form
+    const etbPrice = convertToETB(product.price);
+    
     setNewProduct({
       name: product.name,
       description: product.description,
-      price: product.price.toString(),
+      price: etbPrice.toString(), // Show ETB in form
       category: product.category,
       images: [...product.images],
       inStock: product.inStock,
@@ -620,155 +655,152 @@ export default function AdminDashboard() {
     }
   };
 
-  const renderDashboard = () => (
-    <>
-      {/* Welcome Card */}
-      {/* <div className="bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-2xl p-6 mb-8 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold mb-2">Admin Dashboard</h2>
-            <p className="opacity-90">Manage your e-commerce store efficiently</p>
+  const renderDashboard = () => {
+    // Convert revenue to ETB
+    const totalRevenueETB = convertToETB(stats.totalRevenue);
+    
+    return (
+      <>
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total Orders</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalOrders}</p>
+                <p className="text-xs text-gray-500 mt-1">{stats.recentOrders} new this week</p>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <ShoppingBag className="text-blue-600" size={24} />
+              </div>
+            </div>
           </div>
-          <div className="bg-white/20 p-3 rounded-xl">
-            <BarChart3 size={24} />
-          </div>
-        </div>
-      </div> */}
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Total Orders</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalOrders}</p>
-              <p className="text-xs text-gray-500 mt-1">{stats.recentOrders} new this week</p>
-            </div>
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <ShoppingBag className="text-blue-600" size={24} />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
-              <p className="text-3xl font-bold text-gray-900">${stats.totalRevenue.toFixed(2)}</p>
-              <p className="text-xs text-gray-500 mt-1">All-time sales</p>
-            </div>
-            <div className="bg-green-50 p-3 rounded-lg">
-              <DollarSign className="text-green-600" size={24} />
+          <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
+                <p className="text-3xl font-bold text-gray-900">{formatETB(totalRevenueETB)}</p>
+                <p className="text-xs text-gray-500 mt-1">All-time sales</p>
+              </div>
+              <div className="bg-green-50 p-3 rounded-lg">
+                <DollarSign className="text-green-600" size={24} />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Total Products</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalProducts}</p>
-              <p className="text-xs text-gray-500 mt-1">{stats.lowStockProducts} low stock</p>
-            </div>
-            <div className="bg-purple-50 p-3 rounded-lg">
-              <Package className="text-purple-600" size={24} />
+          <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total Products</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalProducts}</p>
+                <p className="text-xs text-gray-500 mt-1">{stats.lowStockProducts} low stock</p>
+              </div>
+              <div className="bg-purple-50 p-3 rounded-lg">
+                <Package className="text-purple-600" size={24} />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Pending Orders</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.pendingOrders}</p>
-              <p className="text-xs text-gray-500 mt-1">Require attention</p>
-            </div>
-            <div className="bg-yellow-50 p-3 rounded-lg">
-              <Clock className="text-yellow-600" size={24} />
+          <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Pending Orders</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.pendingOrders}</p>
+                <p className="text-xs text-gray-500 mt-1">Require attention</p>
+              </div>
+              <div className="bg-yellow-50 p-3 rounded-lg">
+                <Clock className="text-yellow-600" size={24} />
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <button
-          onClick={() => setActiveTab('products')}
-          className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow text-left"
-        >
-          <div className="flex items-center gap-4">
-            <div className="bg-pink-50 p-3 rounded-lg">
-              <Plus className="text-pink-600" size={24} />
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <button
+            onClick={() => setActiveTab('products')}
+            className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow text-left"
+          >
+            <div className="flex items-center gap-4">
+              <div className="bg-pink-50 p-3 rounded-lg">
+                <Plus className="text-pink-600" size={24} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Add New Product</h3>
+                <p className="text-sm text-gray-600">Add products to your store</p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Add New Product</h3>
-              <p className="text-sm text-gray-600">Add products to your store</p>
-            </div>
-          </div>
-        </button>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('orders')}
-          className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow text-left"
-        >
-          <div className="flex items-center gap-4">
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <ShoppingBag className="text-blue-600" size={24} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Manage Orders</h3>
-              <p className="text-sm text-gray-600">View and update customer orders</p>
-            </div>
-          </div>
-        </button>
-<div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
-  <div className="flex items-center justify-between">
-    <div>
-      <p className="text-sm text-gray-600 mb-1">Total Customers</p>
-      <p className="text-3xl font-bold text-gray-900">{stats.totalCustomers}</p>
-      <p className="text-xs text-gray-500 mt-1">
-        {stats.ordersWithCustomers ? `${stats.ordersWithCustomers} orders placed` : 'No orders yet'}
-      </p>
-    </div>
-    <div className="bg-purple-50 p-3 rounded-lg">
-      <Users className="text-purple-600" size={24} />
-    </div>
-  </div>
-</div>
-      </div>
-
-      {/* Recent Orders */}
-      <div className="bg-white rounded-xl shadow-sm border p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Recent Orders</h3>
           <button
             onClick={() => setActiveTab('orders')}
-            className="text-pink-600 hover:text-pink-700 text-sm font-medium"
+            className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow text-left"
           >
-            View All Orders →
-          </button>
-        </div>
-        <div className="space-y-4">
-          {orders.slice(0, 5).map((order) => (
-            <div key={order._id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
-              <div>
-                <p className="font-medium text-gray-900">{order.orderNumber}</p>
-                <p className="text-sm text-gray-600">
-                  {order.customerInfo?.name || 'Guest Customer'} • {formatDate(order.createdAt)}
-                </p>
+            <div className="flex items-center gap-4">
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <ShoppingBag className="text-blue-600" size={24} />
               </div>
-              <div className="flex items-center gap-4">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                  {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                </span>
-                <span className="font-semibold">${order.totalAmount?.toFixed(2) || '0.00'}</span>
+              <div>
+                <h3 className="font-semibold text-gray-900">Manage Orders</h3>
+                <p className="text-sm text-gray-600">View and update customer orders</p>
               </div>
             </div>
-          ))}
+          </button>
+          
+          <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total Customers</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalCustomers}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {stats.ordersWithCustomers ? `${stats.ordersWithCustomers} orders placed` : 'No orders yet'}
+                </p>
+              </div>
+              <div className="bg-purple-50 p-3 rounded-lg">
+                <Users className="text-purple-600" size={24} />
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </>
-  );
+
+        {/* Recent Orders */}
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">Recent Orders</h3>
+            <button
+              onClick={() => setActiveTab('orders')}
+              className="text-pink-600 hover:text-pink-700 text-sm font-medium"
+            >
+              View All Orders →
+            </button>
+          </div>
+          <div className="space-y-4">
+            {orders.slice(0, 5).map((order) => {
+              const orderTotalETB = convertToETB(order.totalAmount || 0);
+              
+              return (
+                <div key={order._id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-gray-900">{order.orderNumber}</p>
+                    <p className="text-sm text-gray-600">
+                      {order.customerInfo?.name || 'Guest Customer'} • {formatDate(order.createdAt)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                    </span>
+                    <span className="font-semibold">{formatETB(orderTotalETB)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </>
+    );
+  };
 
   const renderOrders = () => (
     <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -819,7 +851,7 @@ export default function AdminDashboard() {
               email: 'No email provided',
               phone: 'No phone provided'
             };
-            const orderTotal = order.totalAmount || 0;
+            const orderTotalETB = convertToETB(order.totalAmount || 0);
             const orderItems = order.items || [];
             
             return (
@@ -851,7 +883,7 @@ export default function AdminDashboard() {
                         </span>
                       </p>
                       <p className="text-lg font-bold text-gray-900">
-                        ${orderTotal.toFixed(2)}
+                        {formatETB(orderTotalETB)}
                       </p>
                     </div>
                   </div>
@@ -964,20 +996,25 @@ export default function AdminDashboard() {
                     {orderItems.length > 0 ? (
                       <>
                         <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
-                          {orderItems.map((item, index) => (
-                            <div key={index} className="flex justify-between text-sm">
-                              <div>
-                                <p className="font-medium">{item.name || 'Unnamed Product'}</p>
-                                <p className="text-gray-600 text-xs">
-                                  {item.quantity || 1} × ${(item.price || 0).toFixed(2)}
-                                  {item.shade && ` • Shade: ${item.shade}`}
+                          {orderItems.map((item, index) => {
+                            const itemPriceETB = convertToETB(item.price || 0);
+                            const itemTotalETB = itemPriceETB * (item.quantity || 1);
+                            
+                            return (
+                              <div key={index} className="flex justify-between text-sm">
+                                <div>
+                                  <p className="font-medium">{item.name || 'Unnamed Product'}</p>
+                                  <p className="text-gray-600 text-xs">
+                                    {item.quantity || 1} × {formatETB(itemPriceETB)}
+                                    {item.shade && ` • Shade: ${item.shade}`}
+                                  </p>
+                                </div>
+                                <p className="font-semibold">
+                                  {formatETB(itemTotalETB)}
                                 </p>
                               </div>
-                              <p className="font-semibold">
-                                ${(((item.quantity || 1) * (item.price || 0))).toFixed(2)}
-                              </p>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                         
                         <div className="mt-4 flex gap-2">
@@ -1039,71 +1076,76 @@ export default function AdminDashboard() {
 
       {/* Products Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {products.map((product) => (
-          <div key={product._id} className="bg-white rounded-xl shadow-sm border overflow-hidden group">
-            
-<div className="relative h-48 bg-gray-100">
-  {product.images && product.images[0] ? (
-    <div 
-      className="w-full h-full bg-cover bg-center"
-      style={{ backgroundImage: `url(${product.images[0]})` }}
-    />
-  ) : (
-    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50">
-      <Package className="text-pink-300" size={48} />
-    </div>
-  )}
-  <div className="absolute top-3 right-3">
-    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-      product.inStock 
-        ? product.stockQuantity < 5 
-          ? 'bg-yellow-100 text-yellow-800'
-          : 'bg-green-100 text-green-800'
-        : 'bg-red-100 text-red-800'
-    }`}>
-      {product.inStock 
-        ? product.stockQuantity < 5 
-          ? 'Low Stock'
-          : 'In Stock'
-        : 'Out of Stock'
-      }
-    </span>
-  </div>
-</div>
-            <div className="p-4">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="font-semibold text-gray-900 line-clamp-1">{product.name}</h3>
-                <span className="text-pink-600 font-bold">${product.price.toFixed(2)}</span>
-              </div>
+        {products.map((product) => {
+          const productPriceETB = convertToETB(product.price);
+          
+          return (
+            <div key={product._id} className="bg-white rounded-xl shadow-sm border overflow-hidden group">
               
-              <p className="text-sm text-gray-600 mb-3 line-clamp-2">{product.description}</p>
-              
-              <div className="flex items-center justify-between text-sm text-gray-500">
-                <div className="flex items-center gap-2">
-                  <Tag size={14} />
-                  <span className="capitalize">{product.category}</span>
+              <div className="relative h-48 bg-gray-100">
+                {product.images && product.images[0] ? (
+                  <div 
+                    className="w-full h-full bg-cover bg-center"
+                    style={{ backgroundImage: `url(${product.images[0]})` }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50">
+                    <Package className="text-pink-300" size={48} />
+                  </div>
+                )}
+                <div className="absolute top-3 right-3">
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    product.inStock 
+                      ? product.stockQuantity < 5 
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {product.inStock 
+                      ? product.stockQuantity < 5 
+                        ? 'Low Stock'
+                        : 'In Stock'
+                      : 'Out of Stock'
+                    }
+                  </span>
                 </div>
-                <span>Stock: {product.stockQuantity}</span>
               </div>
               
-              <div className="flex gap-2 mt-4">
-                <button
-                  onClick={() => editProduct(product)}
-                  className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 flex items-center justify-center gap-2"
-                >
-                  <Edit size={16} />
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDeleteProduct(product._id)}
-                  className="px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100"
-                >
-                  <Trash2 size={16} />
-                </button>
+              <div className="p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-semibold text-gray-900 line-clamp-1">{product.name}</h3>
+                  <span className="text-pink-600 font-bold">{formatETB(productPriceETB)}</span>
+                </div>
+                
+                <p className="text-sm text-gray-600 mb-3 line-clamp-2">{product.description}</p>
+                
+                <div className="flex items-center justify-between text-sm text-gray-500">
+                  <div className="flex items-center gap-2">
+                    <Tag size={14} />
+                    <span className="capitalize">{product.category}</span>
+                  </div>
+                  <span>Stock: {product.stockQuantity}</span>
+                </div>
+                
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={() => editProduct(product)}
+                    className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 flex items-center justify-center gap-2"
+                  >
+                    <Edit size={16} />
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteProduct(product._id)}
+                    className="px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {products.length === 0 && (
@@ -1127,54 +1169,61 @@ export default function AdminDashboard() {
     </div>
   );
 
-  const renderCustomers = () => (
-    <div className="bg-white rounded-xl shadow-sm border p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-4">Customer Management</h2>
-      <p className="text-gray-600 mb-6">View and manage your customers</p>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl">
-          <div className="flex items-center gap-4">
-            <div className="bg-white p-3 rounded-lg">
-              <Users className="text-blue-600" size={24} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Total Customers</h3>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalCustomers}</p>
+  const renderCustomers = () => {
+    // Calculate customer value in ETB
+    const customerValueETB = stats.totalCustomers > 0 
+      ? convertToETB(stats.totalRevenue / stats.totalCustomers)
+      : 0;
+    
+    return (
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Customer Management</h2>
+        <p className="text-gray-600 mb-6">View and manage your customers</p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl">
+            <div className="flex items-center gap-4">
+              <div className="bg-white p-3 rounded-lg">
+                <Users className="text-blue-600" size={24} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Total Customers</h3>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalCustomers}</p>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl">
-          <div className="flex items-center gap-4">
-            <div className="bg-white p-3 rounded-lg">
-              <ShoppingBag className="text-green-600" size={24} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Average Orders</h3>
-              <p className="text-3xl font-bold text-gray-900">
-                {stats.totalCustomers > 0 ? (stats.totalOrders / stats.totalCustomers).toFixed(1) : '0.0'}
-              </p>
+          
+          <div className="p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl">
+            <div className="flex items-center gap-4">
+              <div className="bg-white p-3 rounded-lg">
+                <ShoppingBag className="text-green-600" size={24} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Average Orders</h3>
+                <p className="text-3xl font-bold text-gray-900">
+                  {stats.totalCustomers > 0 ? (stats.totalOrders / stats.totalCustomers).toFixed(1) : '0.0'}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl">
-          <div className="flex items-center gap-4">
-            <div className="bg-white p-3 rounded-lg">
-              <DollarSign className="text-purple-600" size={24} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Customer Value</h3>
-              <p className="text-3xl font-bold text-gray-900">
-                ${stats.totalCustomers > 0 ? (stats.totalRevenue / stats.totalCustomers).toFixed(2) : '0.00'}
-              </p>
+          
+          <div className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl">
+            <div className="flex items-center gap-4">
+              <div className="bg-white p-3 rounded-lg">
+                <DollarSign className="text-purple-600" size={24} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Customer Value</h3>
+                <p className="text-3xl font-bold text-gray-900">
+                  {formatETB(customerValueETB)}
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   if (loading && activeTab === 'orders' && orders.length === 0) {
     return (
@@ -1299,11 +1348,14 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Price & Stock */}
+                {/* Price & Stock - UPDATED FOR ETB */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Price ($) *
+                      Price (ETB) *
+                      <span className="text-xs text-gray-500 ml-1">
+                        ≈ ${convertToUSD(parseFloat(newProduct.price) || 0).toFixed(2)} USD
+                      </span>
                     </label>
                     <input
                       type="number"

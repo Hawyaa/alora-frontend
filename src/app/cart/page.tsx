@@ -1,27 +1,42 @@
+// app/cart/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ShoppingBag, Trash2, Plus, Minus, ArrowLeft, CreditCard } from 'lucide-react'
 import { useCart } from '@/contexts/CartContext'
+import { useAuth } from '@/contexts/AuthContext'
 import Image from 'next/image'
 import Link from 'next/link'
 
 export default function CartPage() {
   const [isLoading, setIsLoading] = useState(false)
-  const [hasToken, setHasToken] = useState(false)
   const router = useRouter()
-  const { cartItems, clearCart, updateQuantity, removeFromCart, cartTotal } = useCart()
-
-  // Check for token on component mount
+  const { cartItems, clearCart, updateQuantity, removeFromCart, cartTotal, refreshCart } = useCart()
+  const { isAuthenticated, user } = useAuth()
+  
+  // Initial load on component mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('alora-token')
-      setHasToken(!!token)
-    }
-  }, [])
+    console.log('🔄 CartPage mounted, refreshing cart...');
+    refreshCart();
+  }, []); // Only run once on mount
 
-  // FIXED: Use item.id instead of itemUniqueId
+  // Listen for storage changes (login/logout in other tabs)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'alora-user' || e.key === 'alora-token') {
+        console.log('🔄 Auth changed, refreshing cart...');
+        setTimeout(refreshCart, 100);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [refreshCart]);
+
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity < 1) {
       removeFromCart(itemId)
@@ -30,9 +45,7 @@ export default function CartPage() {
     }
   }
 
-  // FIXED: Use item.id for removal
   const handleRemoveItem = (itemId: string) => {
-    console.log('Remove button clicked for item ID:', itemId)
     if (confirm('Are you sure you want to remove this item?')) {
       removeFromCart(itemId)
     }
@@ -42,11 +55,12 @@ export default function CartPage() {
     setIsLoading(true)
     try {
       // Check if user is logged in for checkout
-      if (!hasToken) {
-        // Redirect to login with checkout intent
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('checkout-intent', 'true')
+      if (!isAuthenticated) {
+        // Save cart items before redirecting to login
+        if (typeof window !== 'undefined' && cartItems.length > 0) {
+          localStorage.setItem('pending-cart-items', JSON.stringify(cartItems));
         }
+        
         router.push('/login')
         return
       }
@@ -94,6 +108,12 @@ export default function CartPage() {
               </span>
             </div>
           </div>
+          {/* User info display */}
+          {isAuthenticated && (
+            <div className="text-sm text-gray-600 pb-2">
+              Shopping as: {user?.name || user?.email}
+            </div>
+          )}
         </div>
       </div>
 
@@ -121,6 +141,11 @@ export default function CartPage() {
                   <h2 className="text-lg font-semibold">
                     Cart Items ({cartItems.length})
                   </h2>
+                  {isAuthenticated && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      These items are saved to your account
+                    </p>
+                  )}
                 </div>
                 
                 <div className="divide-y">
@@ -171,10 +196,10 @@ export default function CartPage() {
                         </button>
                       </div>
 
-                      {/* Price and remove - FIXED: Use item.id */}
+                      {/* Price and remove */}
                       <div className="text-right">
                         <p className="text-lg font-semibold">
-                          ${(item.price * item.quantity).toFixed(2)}
+                          ETB {(item.price * item.quantity).toFixed(2)}
                         </p>
                         <button
                           onClick={() => handleRemoveItem(item.id)}
@@ -202,6 +227,13 @@ export default function CartPage() {
                     <Trash2 size={16} className="mr-2" />
                     Clear Cart
                   </button>
+                  <button
+                    onClick={refreshCart}
+                    className="text-blue-500 hover:text-blue-700 flex items-center mt-2"
+                  >
+                    <span className="mr-2">🔄</span>
+                    Refresh Cart
+                  </button>
                 </div>
               </div>
             </div>
@@ -214,19 +246,19 @@ export default function CartPage() {
                 <div className="space-y-3 mb-6">
                   <div className="flex justify-between text-gray-600">
                     <span>Subtotal</span>
-                    <span>${cartTotal.toFixed(2)}</span>
+                    <span>ETB {cartTotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Shipping</span>
-                    <span>$5.00</span>
+                    <span>ETB 5.00</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Tax (8%)</span>
-                    <span>${(cartTotal * 0.08).toFixed(2)}</span>
+                    <span>ETB {(cartTotal * 0.08).toFixed(2)}</span>
                   </div>
                   <div className="border-t pt-3 flex justify-between text-lg font-semibold text-gray-900">
                     <span>Total</span>
-                    <span>${total.toFixed(2)}</span>
+                    <span>ETB {total.toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -243,13 +275,13 @@ export default function CartPage() {
                   ) : (
                     <>
                       <CreditCard size={20} className="mr-2" />
-                      {hasToken ? 'Proceed to Checkout' : 'Login to Checkout'}
+                      {isAuthenticated ? 'Proceed to Checkout' : 'Login to Checkout'}
                     </>
                   )}
                 </button>
 
                 <p className="text-xs text-gray-500 text-center mt-4">
-                  {!hasToken 
+                  {!isAuthenticated 
                     ? "Login required for checkout" 
                     : "Secure payment processing"}
                 </p>

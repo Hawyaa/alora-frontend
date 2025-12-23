@@ -1,5 +1,4 @@
-// frontend/src/components/navigation.tsx - FIXED
-
+// components/navigation.tsx - ADD DEBUG MODE
 "use client";
 
 import Link from "next/link";
@@ -10,14 +9,35 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
-  const { cartItems, isLoading } = useCart(); // Changed from cartCount to cartItems
+  const { cartItems, isLoading } = useCart();
   const { isAuthenticated, user, logout } = useAuth();
 
-  // Check if current user is admin
   const isAdmin = user?.role === 'admin';
-
-  // Calculate cart count from cartItems
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
+
+  // Debug function to see cart storage
+  const debugCartStorage = () => {
+    if (typeof window !== 'undefined') {
+      console.log('🔍 CART STORAGE DEBUG:');
+      console.log('Cart Items from Context:', cartItems);
+      console.log('Cart Count:', cartCount);
+      
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.includes('cart')) {
+          try {
+            const value = localStorage.getItem(key);
+            console.log(`📦 ${key}:`, value ? JSON.parse(value) : 'empty');
+          } catch (e) {
+            console.log(`📦 ${key}:`, localStorage.getItem(key));
+          }
+        }
+      }
+      
+      console.log('alora-token:', localStorage.getItem('alora-token'));
+      console.log('alora-user:', localStorage.getItem('alora-user'));
+    }
+  };
 
   return (
     <nav
@@ -25,7 +45,7 @@ export default function Navigation() {
       style={{ backgroundColor: "rgb(249, 210, 229)" }}
     >
       <div className="container-custom flex items-center justify-between h-20">
-        {/* Logo - Moved to the left */}
+        {/* Logo */}
         <div className="flex items-center">
           <Link
             href="/"
@@ -34,12 +54,13 @@ export default function Navigation() {
               fontFamily: "'Segoe Script', cursive",
               color: "rgb(255, 112, 183)",
             }}
+            onClick={() => setIsOpen(false)}
           >
             Alora Lipgloss
           </Link>
         </div>
 
-        {/* Desktop Navigation Links - Center aligned */}
+        {/* Desktop Navigation */}
         <div className="hidden md:flex items-center justify-center gap-8 flex-1">
           <Link
             href="/"
@@ -69,15 +90,24 @@ export default function Navigation() {
           >
             Contact
           </Link>
+          
+          {/* Debug Button (Only in development) */}
+          {process.env.NODE_ENV === 'development' && (
+            <button
+              onClick={debugCartStorage}
+              className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded"
+              title="Debug Cart"
+            >
+              🐛 Debug
+            </button>
+          )}
         </div>
 
         {/* Mobile Header */}
         <div className="flex md:hidden items-center justify-between w-full">
-          {/* Mobile Menu Button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="p-2 hover:bg-black/10 rounded-lg transition-colors"
-            style={{ fontFamily: "'Georgia', sans-serif" }}
           >
             {isOpen ? (
               <X size={20} className="text-black" />
@@ -86,10 +116,10 @@ export default function Navigation() {
             )}
           </button>
 
-          {/* Mobile Cart */}
           <Link
             href="/cart"
             className="relative p-2 hover:bg-black/10 rounded-lg transition-colors"
+            onClick={() => setIsOpen(false)}
           >
             <ShoppingBag size={20} className="text-black" />
             {!isLoading && cartCount > 0 && (
@@ -103,17 +133,14 @@ export default function Navigation() {
           </Link>
         </div>
 
-        {/* Desktop Right Section (Auth + Cart + Admin) */}
+        {/* Desktop Right Section */}
         <div className="hidden md:flex items-center gap-4">
-          {/* User Auth Status */}
           <div className="flex items-center gap-4" style={{ fontFamily: "'Georgia', sans-serif" }}>
           {isAdmin && (
             <Link
               href="/admin"
               className="text-sm font-medium text-black hover:text-gray-700 transition-colors"
-              style={{ fontFamily: "'Georgia', sans-serif" }}
             >
-              {/* <Shield size={16} /> */}
               Admin Dashboard
             </Link>
           )}
@@ -146,9 +173,7 @@ export default function Navigation() {
               </>
             )}
           </div>
-         
-          {/* Admin Dashboard Button - GRAY COLOR */}
-          {/* Cart Icon */}
+          
           <Link
             href="/cart"
             className="relative p-2 hover:bg-black/10 rounded-lg transition-colors"
@@ -177,7 +202,6 @@ export default function Navigation() {
               href="/"
               className="text-sm font-medium text-black hover:text-gray-700 py-2 transition-colors px-4 rounded-lg hover:bg-black/10"
               onClick={() => setIsOpen(false)}
-              style={{ fontFamily: "'Georgia', sans-serif" }}
             >
               Home
             </Link>
@@ -185,7 +209,6 @@ export default function Navigation() {
               href="/shop"
               className="text-sm font-medium text-black hover:text-gray-700 py-2 transition-colors px-4 rounded-lg hover:bg-black/10"
               onClick={() => setIsOpen(false)}
-              style={{ fontFamily: "'Georgia', sans-serif" }}
             >
               Shop
             </Link>
@@ -193,7 +216,6 @@ export default function Navigation() {
               href="/about"
               className="text-sm font-medium text-black hover:text-gray-700 py-2 transition-colors px-4 rounded-lg hover:bg-black/10"
               onClick={() => setIsOpen(false)}
-              style={{ fontFamily: "'Georgia', sans-serif" }}
             >
               About
             </Link>
@@ -201,28 +223,25 @@ export default function Navigation() {
               href="/contact"
               className="text-sm font-medium text-black hover:text-gray-700 py-2 transition-colors px-4 rounded-lg hover:bg-black/10"
               onClick={() => setIsOpen(false)}
-              style={{ fontFamily: "'Georgia', sans-serif" }}
             >
               Contact
             </Link>
-            {/* Admin Link in Mobile Menu - GRAY COLOR */}
+            
             {isAdmin && (
               <Link
                 href="/admin"
                 className="text-sm font-medium text-black hover:text-gray-700 transition-colors"
                 onClick={() => setIsOpen(false)}
-                style={{ fontFamily: "'Georgia', sans-serif" }}
               >
-                <Shield size={16} />
+                <Shield size={16} className="inline mr-2" />
                 Admin Dashboard
               </Link>
             )}
 
-            {/* Mobile Auth Links */}
             <div className="border-t border-gray-300 pt-4">
               {isAuthenticated ? (
                 <div className="space-y-2">
-                  <div className="px-4 text-sm text-gray-600" style={{ fontFamily: "'Bahnschrift', sans-serif" }}>
+                  <div className="px-4 text-sm text-gray-600">
                     Logged in as: {user?.name}
                   </div>
                   <button
@@ -231,7 +250,6 @@ export default function Navigation() {
                       setIsOpen(false);
                     }}
                     className="text-sm font-medium text-black hover:text-gray-700 py-2 transition-colors px-4 rounded-lg hover:bg-black/10 w-full text-left"
-                    style={{ fontFamily: "'Georgia', sans-serif" }}
                   >
                     Logout
                   </button>
@@ -242,7 +260,6 @@ export default function Navigation() {
                     href="/login"
                     className="text-sm font-medium text-black hover:text-gray-700 py-2 transition-colors px-4 rounded-lg hover:bg-black/10 block"
                     onClick={() => setIsOpen(false)}
-                    style={{ fontFamily: "'Georgia', sans-serif" }}
                   >
                     Login
                   </Link>
@@ -250,7 +267,6 @@ export default function Navigation() {
                     href="/register"
                     className="text-sm font-medium text-black hover:text-gray-700 py-2 transition-colors px-4 "
                     onClick={() => setIsOpen(false)}
-                    style={{ fontFamily: "'Georgia', sans-serif" }}
                   >
                     Register
                   </Link>

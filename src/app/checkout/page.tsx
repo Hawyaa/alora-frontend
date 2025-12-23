@@ -1,8 +1,11 @@
+// app/checkout/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CreditCard, Wallet, ArrowLeft, Loader2, User } from 'lucide-react';
+import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -24,26 +27,110 @@ export default function CheckoutPage() {
   const [userToken, setUserToken] = useState<string | null>(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderId, setOrderId] = useState<string>('');
+  const [debugInfo, setDebugInfo] = useState<string>('');
+  
+  const { clearCart, cartItems: contextCartItems } = useCart();
+  const { user, isAuthenticated } = useAuth();
+  const getCartKey = () => {
+    if (typeof window === 'undefined') return 'alora-cart-guest';
+    
+    const user = localStorage.getItem('alora-user');
+    if (user) {
+      try {
+        const userData = JSON.parse(user);
+        return `alora-cart-${userData.id || userData.email || 'user'}`;
+      } catch {
+        return 'alora-cart-guest';
+      }
+    }
+    
+    return 'alora-cart-guest';
+  };
+  
+  // Add this cleanup function:
+  const cleanupOldCarts = () => {
+    if (typeof window === 'undefined') return;
+    
+    const currentKey = getCartKey();
+    
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('alora-cart-') && key !== currentKey) {
+        localStorage.removeItem(key);
+      }
+    }
+    localStorage.removeItem('alora-cart');
+  };
+
+  // Function to clear ALL cart storage
+  const clearAllCartStorage = () => {
+    if (typeof window !== 'undefined') {
+      // Clear using CartContext's getCartKey
+      const currentCartKey = getCartKey();
+      localStorage.removeItem(currentCartKey);
+      
+      // Clear all possible cart keys
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.includes('cart')) {
+          localStorage.removeItem(key);
+        }
+      }
+      
+      // Also clear legacy key
+      localStorage.removeItem('alora-cart');
+      
+      // Clear cart state
+      clearCart();
+      
+      console.log('🧹 Cleared all cart storage:', currentCartKey);
+      setDebugInfo(`Cleared cart storage: ${currentCartKey}`);
+    }
+  };
 
   // Function to load cart from ALL possible sources
   const loadCartItems = () => {
-    console.log('🛒 Loading cart for checkout...');
+    if (typeof window === 'undefined') return [];
     
-    // Try to get cart from localStorage
-    const savedCart = localStorage.getItem('alora-cart');
+    // Try current user's cart key
+    const currentCartKey = getCartKey();
+    const savedCart = localStorage.getItem(currentCartKey);
     
     if (savedCart) {
       try {
         const parsed = JSON.parse(savedCart);
-        console.log(`✅ Loaded ${parsed.length} items from alora-cart`);
+        console.log(`✅ Loaded ${parsed.length} items from ${currentCartKey}`);
+        setDebugInfo(`Loaded ${parsed.length} items from ${currentCartKey}`);
         return parsed;
       } catch (error) {
         console.error('Error parsing cart:', error);
-        return [];
+        setDebugInfo(`Error parsing cart from ${currentCartKey}: ${error}`);
       }
     }
     
-    console.log('❌ No cart found in alora-cart');
+    // Fallback to legacy key
+    const legacyCart = localStorage.getItem('alora-cart');
+    if (legacyCart) {
+      try {
+        const parsed = JSON.parse(legacyCart);
+        console.log(`✅ Loaded ${parsed.length} items from alora-cart (legacy)`);
+        setDebugInfo(`Loaded ${parsed.length} items from legacy storage`);
+        return parsed;
+      } catch (error) {
+        console.error('Error parsing legacy cart:', error);
+        setDebugInfo(`Error parsing legacy cart: ${error}`);
+      }
+    }
+    
+    // Fallback to context
+    if (contextCartItems && contextCartItems.length > 0) {
+      console.log(`✅ Loaded ${contextCartItems.length} items from context`);
+      setDebugInfo(`Loaded ${contextCartItems.length} items from context`);
+      return contextCartItems;
+    }
+    
+    console.log('❌ No cart found');
+    setDebugInfo('No cart items found');
     return [];
   };
 
@@ -53,30 +140,32 @@ export default function CheckoutPage() {
       console.log('🔄 Cart updated, reloading checkout cart...');
       const items = loadCartItems();
       setCartItems(items);
-      console.log('📊 Current cart items:', items.length);
+      console.log('📊 Current cart items for checkout:', items.length);
     };
 
-    // Load initial cart
     handleCartUpdate();
 
-    // Listen for storage changes (when cart is updated in another tab/component)
-    window.addEventListener('storage', handleCartUpdate);
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key?.includes('cart') || e.key === 'alora-user' || e.key === 'alora-token') {
+        console.log('📦 Storage changed:', e.key);
+        handleCartUpdate();
+      }
+    };
     
-    // Also check every second for updates
-    const interval = setInterval(handleCartUpdate, 1000);
+    window.addEventListener('storage', handleStorageChange);
+    
+    const interval = setInterval(handleCartUpdate, 2000);
 
     return () => {
-      window.removeEventListener('storage', handleCartUpdate);
+      window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
     };
   }, []);
 
   useEffect(() => {
-    // Check if cart is empty
     if (cartItems.length === 0) {
       console.log('🛒 Cart is empty, checking if we should redirect...');
-      // Only redirect if we're sure cart should be empty
-      // Don't redirect immediately, give time for cart to load
+      setDebugInfo('Cart is empty');
       const timer = setTimeout(() => {
         if (cartItems.length === 0) {
           alert('Your cart is empty');
@@ -87,9 +176,9 @@ export default function CheckoutPage() {
       return () => clearTimeout(timer);
     } else {
       console.log(`✅ Ready for checkout with ${cartItems.length} items`);
+      setDebugInfo(`Ready with ${cartItems.length} items`);
     }
     
-    // Get user token and info
     const token = localStorage.getItem('alora-token');
     setUserToken(token);
     
@@ -117,14 +206,103 @@ export default function CheckoutPage() {
     return subtotal + shipping + tax;
   };
 
+  // Function to store cart items for payment
+  const storeCartForPayment = async () => {
+    if (!userToken) return { success: false, error: 'Not authenticated' };
+
+    try {
+      const response = await fetch('http://localhost:5000/api/payment/store-cart', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userToken}`
+        },
+        body: JSON.stringify({ cartItems })
+      });
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Store cart error:', error);
+      return { success: false, error: 'Failed to store cart' };
+    }
+  };
+
+  // Function to initialize Chapa payment
+  const initializeChapaPayment = async (amount: number, orderId: string) => {
+    if (!userToken) {
+      return { success: false, error: 'Please login to use online payment' };
+    }
+
+    try {
+      console.log('💰 Initializing Chapa payment for order:', orderId);
+      
+      // Store cart items first
+      await storeCartForPayment();
+
+      // Prepare user info
+      const nameParts = customerInfo.name.trim().split(' ');
+      const firstName = nameParts[0] || 'Customer';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      // Convert USD to ETB (Chapa uses ETB) - 1 USD ≈ 55 ETB
+      const amountInETB = Math.round(amount * 55);
+      
+      console.log('💳 Payment details:', {
+        amount: amountInETB,
+        email: customerInfo.email,
+        firstName,
+        lastName,
+        phone: customerInfo.phone
+      });
+
+      // Initialize payment with Chapa
+      const response = await fetch('http://localhost:5000/api/payment/initialize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userToken}`
+        },
+        body: JSON.stringify({
+          amount: amountInETB,
+          email: customerInfo.email,
+          firstName,
+          lastName,
+          phone: customerInfo.phone,
+          orderId: orderId,
+          return_url: `${window.location.origin}/payment/success`,
+          cancel_url: `${window.location.origin}/payment/cancel`
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.checkout_url) {
+        console.log('✅ Payment initialized successfully!');
+        console.log('🔗 Chapa checkout URL:', data.checkout_url);
+        return { 
+          success: true, 
+          checkout_url: data.checkout_url,
+          tx_ref: data.tx_ref 
+        };
+      } else {
+        console.error('❌ Payment initialization failed:', data.error);
+        return { success: false, error: data.error || 'Payment initialization failed' };
+      }
+    } catch (error: any) {
+      console.error('💥 Payment initialization error:', error);
+      return { success: false, error: error.message || 'Payment initialization failed' };
+    }
+  };
+
   const handlePlaceOrder = async () => {
     try {
       setLoading(true);
+      setDebugInfo('Processing order...');
       
       console.log('🔍 CHECKOUT DEBUG ============');
       console.log('📦 Current cart items:', cartItems);
       
-      // Get customer info - either from user data or form
       let finalCustomerInfo = {
         name: '',
         email: '',
@@ -132,7 +310,6 @@ export default function CheckoutPage() {
       };
       
       if (userToken) {
-        // Logged in user - get from localStorage
         const userData = localStorage.getItem('alora-user');
         if (userData) {
           try {
@@ -143,53 +320,65 @@ export default function CheckoutPage() {
               phone: user.phone || customerInfo.phone.trim()
             };
             console.log('✅ Using logged-in user info:', finalCustomerInfo);
+            setDebugInfo(`Using user: ${finalCustomerInfo.name}`);
           } catch (error) {
-            console.error('Error parsing user data:', error);
-            // Fallback to form data
             finalCustomerInfo = {
               name: customerInfo.name.trim(),
               email: customerInfo.email.trim(),
               phone: customerInfo.phone.trim()
             };
+            setDebugInfo('Using form data (parse error)');
           }
         } else {
-          // No user data found
           finalCustomerInfo = {
             name: customerInfo.name.trim(),
             email: customerInfo.email.trim(),
             phone: customerInfo.phone.trim()
           };
+          setDebugInfo('Using form data (no user data)');
         }
       } else {
-        // Guest user - use form data
         finalCustomerInfo = {
           name: customerInfo.name.trim(),
           email: customerInfo.email.trim(),
           phone: customerInfo.phone.trim()
         };
         console.log('✅ Using guest info:', finalCustomerInfo);
+        setDebugInfo('Guest checkout');
       }
       
-      // Validate we have required info
+      // Validate required fields
       if (!finalCustomerInfo.name || !finalCustomerInfo.phone) {
         alert('Please enter your name and phone number');
+        setDebugInfo('Missing name or phone');
+        setLoading(false);
+        return;
+      }
+
+      if (paymentMethod === 'online' && !finalCustomerInfo.email) {
+        alert('Please enter your email for online payment');
+        setDebugInfo('Missing email for online payment');
         setLoading(false);
         return;
       }
       
-      // Validate address
+      if (paymentMethod === 'online' && !userToken) {
+        alert('Please login to use online payment');
+        setDebugInfo('Login required for online payment');
+        setLoading(false);
+        return;
+      }
+      
       if (!address.street.trim() || !address.city.trim()) {
         alert('Please enter your delivery address');
+        setDebugInfo('Missing address');
         setLoading(false);
         return;
       }
       
-      // Debug the final customer info
       console.log('🎯 FINAL CUSTOMER INFO:', finalCustomerInfo);
       console.log('📦 Cart items count:', cartItems.length);
-      console.log('🏠 Delivery address:', address);
       
-      // Prepare order data - make sure we have all required fields
       const orderData = {
         items: cartItems.map(item => ({
           productId: item.productId || item.id || '',
@@ -206,24 +395,20 @@ export default function CheckoutPage() {
       
       console.log('📤 Order data to send:', JSON.stringify(orderData, null, 2));
       
-      // Calculate total for localStorage
       const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const shipping = 5;
       const tax = subtotal * 0.08;
       const totalAmount = subtotal + shipping + tax;
       
-      // Prepare headers
       const headers: any = {
         'Content-Type': 'application/json'
       };
       
-      // Add token if user is logged in
       if (userToken) {
         headers['Authorization'] = `Bearer ${userToken}`;
         console.log('🔑 Adding auth token');
       }
       
-      // Create order info object
       const orderInfo: any = {
         orderId: null,
         items: cartItems,
@@ -235,10 +420,9 @@ export default function CheckoutPage() {
         status: 'pending'
       };
       
-      console.log('💾 Saving order to localStorage:', orderInfo);
+      console.log('💾 Saving order to localStorage');
       localStorage.setItem('last-order', JSON.stringify(orderInfo));
       
-      // Send request
       console.log('📡 Sending POST to /api/orders/checkout...');
       const response = await fetch('http://localhost:5000/api/orders/checkout', {
         method: 'POST',
@@ -262,40 +446,67 @@ export default function CheckoutPage() {
       
       if (data.success) {
         console.log('✅ Order created successfully!');
-        console.log('📋 Order ID from backend:', data.orderId || data.order?._id);
-        
-        // Get order ID from response
         const backendOrderId = data.orderId || data.order?._id;
         
-        // Update localStorage with real order ID
         orderInfo.orderId = backendOrderId;
         localStorage.setItem('last-order', JSON.stringify(orderInfo));
         
-        // Clear cart from localStorage
-        localStorage.removeItem('alora-cart');
-        console.log('🗑️ Cleared cart from localStorage');
+        // 🎯 CRITICAL FIX: Clear ALL cart storage
+        clearAllCartStorage();
         
         setOrderId(backendOrderId);
-        setOrderSuccess(true);
         
-        // Wait a moment and redirect
-        setTimeout(() => {
-          router.push(`/order-confirmation?orderId=${backendOrderId}`);
-        }, 1500);
+        // Handle payment based on method
+        if (paymentMethod === 'cash') {
+          // Cash payment - show success and redirect
+          console.log('💰 Cash payment selected');
+          setOrderSuccess(true);
+          setDebugInfo(`Order successful! ID: ${backendOrderId}`);
+          
+          setTimeout(() => {
+            router.push(`/order-confirmation?orderId=${backendOrderId}`);
+          }, 1500);
+          
+        } else if (paymentMethod === 'online') {
+          // Online payment - initialize Chapa
+          console.log('💳 Online payment selected - initializing Chapa...');
+          
+          const paymentResult = await initializeChapaPayment(totalAmount, backendOrderId);
+          
+          if (paymentResult.success && paymentResult.checkout_url) {
+            // Store payment reference
+            orderInfo.paymentReference = paymentResult.tx_ref;
+            orderInfo.paymentStatus = 'pending';
+            localStorage.setItem('last-order', JSON.stringify(orderInfo));
+            
+            console.log('🔗 Redirecting to Chapa payment page...');
+            
+            // ✅ CRITICAL: ACTUALLY REDIRECT TO CHAPA PAYMENT PAGE
+            window.location.href = paymentResult.checkout_url;
+            
+            // Don't continue execution after redirect
+            return;
+            
+          } else {
+            console.error('❌ Chapa payment failed:', paymentResult.error);
+            alert(`Online payment failed: ${paymentResult.error}. Please try cash payment instead.`);
+            setLoading(false);
+          }
+        }
         
       } else {
         console.error('❌ Order creation failed:', data.message || data.error);
         
-        // Even if backend fails, use localStorage data with generated ID
         const localOrderId = `local-${Date.now()}`;
         orderInfo.orderId = localOrderId;
         localStorage.setItem('last-order', JSON.stringify(orderInfo));
         
-        // Clear cart
-        localStorage.removeItem('alora-cart');
+        // Clear cart even if backend fails
+        clearAllCartStorage();
         
         setOrderId(localOrderId);
         setOrderSuccess(true);
+        setDebugInfo(`Order saved locally! ID: ${localOrderId}`);
         
         setTimeout(() => {
           router.push(`/order-confirmation?orderId=${localOrderId}`);
@@ -304,9 +515,8 @@ export default function CheckoutPage() {
       
     } catch (error: any) {
       console.error('💥 Network/fetch error:', error);
-      console.error('Error message:', error.message);
+      setDebugInfo(`Network error: ${error.message}`);
       
-      // On network error, still save to localStorage
       const errorOrderId = `error-${Date.now()}`;
       const emergencyOrder = {
         orderId: errorOrderId,
@@ -320,10 +530,13 @@ export default function CheckoutPage() {
       };
       
       localStorage.setItem('last-order', JSON.stringify(emergencyOrder));
-      localStorage.removeItem('alora-cart');
+      
+      // Clear cart on error too
+      clearAllCartStorage();
       
       setOrderId(errorOrderId);
       setOrderSuccess(true);
+      setDebugInfo(`Order saved after error! ID: ${errorOrderId}`);
       
       setTimeout(() => {
         router.push(`/order-confirmation?orderId=${errorOrderId}`);
@@ -335,8 +548,8 @@ export default function CheckoutPage() {
     }
   };
 
-  // Success modal
-  if (orderSuccess) {
+  // Success modal (for cash payments only)
+  if (orderSuccess && paymentMethod === 'cash') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white p-8 rounded-xl shadow-lg max-w-md text-center">
@@ -355,6 +568,9 @@ export default function CheckoutPage() {
           <div className="animate-pulse text-sm text-gray-500">
             Redirecting to confirmation page...
           </div>
+          <div className="mt-4 text-xs text-gray-400">
+            {debugInfo}
+          </div>
         </div>
       </div>
     );
@@ -366,6 +582,13 @@ export default function CheckoutPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading checkout...</p>
+          <p className="text-sm text-gray-400 mt-2">{debugInfo}</p>
+          <button 
+            onClick={() => router.push('/cart')}
+            className="mt-4 px-4 py-2 bg-pink-500 text-white rounded-lg"
+          >
+            Back to Cart
+          </button>
         </div>
       </div>
     );
@@ -379,6 +602,24 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
+        {/* Debug Info */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="text-sm font-medium">Debug: {debugInfo}</span>
+                <span className="text-xs text-gray-500 ml-2">({getCartKey()})</span>
+              </div>
+              <button 
+                onClick={clearAllCartStorage}
+                className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded"
+              >
+                Clear Cart
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="mb-8">
           <button
@@ -390,13 +631,16 @@ export default function CheckoutPage() {
           </button>
           <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
           <p className="text-gray-600 mt-2">Complete your order</p>
+          <div className="mt-1 text-sm text-gray-500">
+            {isAuthenticated ? `Logged in as: ${user?.name}` : 'Guest checkout'}
+          </div>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Left Column - Form */}
           <div className="lg:w-2/3">
             <div className="bg-white p-6 rounded-xl shadow-sm border space-y-8">
-              {/* Customer Info (ALWAYS show for both guest and logged in users) */}
+              {/* Customer Info */}
               <div>
                 <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
                   <User size={20} className="mr-2" />
@@ -434,6 +678,7 @@ export default function CheckoutPage() {
                     {userToken 
                       ? 'Your account information is loaded. You can update it here if needed.' 
                       : 'Please enter your information for order updates.'}
+                    {paymentMethod === 'online' && ' Email is required for online payment.'}
                   </p>
                 </div>
               </div>
@@ -471,13 +716,6 @@ export default function CheckoutPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input
                       type="text"
-                      placeholder="ZIP/Postal Code"
-                      className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                      value={address.zipCode}
-                      onChange={(e) => setAddress({...address, zipCode: e.target.value})}
-                    />
-                    <input
-                      type="text"
                       placeholder="Country"
                       className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                       value={address.country}
@@ -505,6 +743,7 @@ export default function CheckoutPage() {
                       <div>
                         <div className="font-medium text-gray-900">Pay in Cash</div>
                         <div className="text-sm text-gray-600">Pay when you receive your order</div>
+                        <div className="text-xs text-green-600 mt-1">Available for everyone</div>
                       </div>
                     </div>
                   </label>
@@ -517,12 +756,18 @@ export default function CheckoutPage() {
                       checked={paymentMethod === 'online'}
                       onChange={(e) => setPaymentMethod('online')}
                       className="mr-3 h-5 w-5 text-pink-500 focus:ring-pink-500"
+                      disabled={!userToken}
                     />
                     <div className="flex items-center">
                       <CreditCard size={24} className="mr-3 text-gray-600" />
                       <div>
                         <div className="font-medium text-gray-900">Pay Online</div>
                         <div className="text-sm text-gray-600">Pay now with Chapa</div>
+                        {!userToken ? (
+                          <div className="text-xs text-amber-600 mt-1">Please login to use online payment</div>
+                        ) : (
+                          <div className="text-xs text-green-600 mt-1">Secure payment with Chapa</div>
+                        )}
                       </div>
                     </div>
                   </label>
@@ -532,7 +777,15 @@ export default function CheckoutPage() {
               {/* Place Order Button */}
               <button
                 onClick={handlePlaceOrder}
-                disabled={loading || !address.street || !address.city || !customerInfo.name || !customerInfo.phone}
+                disabled={
+                  loading || 
+                  !address.street || 
+                  !address.city || 
+                  !customerInfo.name || 
+                  !customerInfo.phone ||
+                  (paymentMethod === 'online' && !customerInfo.email) ||
+                  (paymentMethod === 'online' && !userToken)
+                }
                 className="w-full bg-gradient-to-r from-rose-500 to-pink-600 text-white py-4 rounded-xl font-semibold hover:from-rose-600 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-all duration-300 shadow-lg hover:shadow-xl"
               >
                 {loading ? (
@@ -549,6 +802,7 @@ export default function CheckoutPage() {
                 {userToken 
                   ? '✓ Your order will be linked to your account' 
                   : 'Guest checkout - you will receive order updates via SMS/Email.'}
+                {paymentMethod === 'online' && ' You will be redirected to Chapa for payment.'}
               </p>
             </div>
           </div>
@@ -579,7 +833,7 @@ export default function CheckoutPage() {
                       <h4 className="font-medium text-gray-900 truncate">{item.name}</h4>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Qty: {item.quantity}</span>
-                        <span className="font-medium">${(item.price * item.quantity).toFixed(2)}</span>
+                        <span className="font-medium">ETB{(item.price * item.quantity).toFixed(2)}</span>
                       </div>
                       {item.shade && item.shade !== 'default' && (
                         <span className="text-xs text-pink-600 bg-pink-50 px-2 py-0.5 rounded">
@@ -595,20 +849,30 @@ export default function CheckoutPage() {
               <div className="border-t pt-4 space-y-3">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span>ETB{subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Shipping</span>
-                  <span>$5.00</span>
+                  <span>ETB5.00</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Tax (8%)</span>
-                  <span>${tax.toFixed(2)}</span>
+                  <span>ETB{tax.toFixed(2)}</span>
                 </div>
                 <div className="border-t pt-3 flex justify-between font-bold text-lg text-gray-900">
                   <span>Total</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>ETB{total.toFixed(2)}</span>
                 </div>
+                {paymentMethod === 'online' && (
+                  <div className="pt-2">
+                    <p className="text-sm text-amber-600">
+                      ≈ {Math.round(total * 55)} ETB (for Chapa payment)
+                    </p>
+                    <p className="text-xs text-blue-500 mt-1">
+                      You will be redirected to Chapa's secure payment page
+                    </p>
+                  </div>
+                )}
               </div>
               
               {/* Order Note */}
@@ -617,6 +881,11 @@ export default function CheckoutPage() {
                   By placing your order, you agree to our Terms of Service and Privacy Policy.
                   Delivery time: 3-5 business days.
                 </p>
+                {paymentMethod === 'online' && (
+                  <p className="text-xs text-blue-500 mt-2">
+                    Online payments are processed securely by Chapa.
+                  </p>
+                )}
               </div>
             </div>
           </div>

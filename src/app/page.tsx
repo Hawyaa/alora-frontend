@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Star, ShoppingBag } from "lucide-react"
 import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import { api } from '@/lib/api' // Import your API client
+import { api } from '@/lib/api'
 
 const circleImages = [
   {
@@ -82,12 +82,14 @@ const heroImages = [
 
 function CircleCarousel() {
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [itemsToShow, setItemsToShow] = useState(6)
+  const [itemsToShow, setItemsToShow] = useState(3)
 
   useEffect(() => {
     const updateItemsToShow = () => {
       if (window.innerWidth < 640) {
         setItemsToShow(2)
+      } else if (window.innerWidth < 768) {
+        setItemsToShow(3)
       } else if (window.innerWidth < 1024) {
         setItemsToShow(4)
       } else {
@@ -115,38 +117,40 @@ function CircleCarousel() {
   const itemWidth = 100 / itemsToShow
 
   return (
-    <section className="py-20" style={{ backgroundColor: 'rgb(249, 210, 229)' }}>
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-serif font-bold text-black mb-4">
+    <section className="py-12 md:py-20 px-4 sm:px-6" style={{ backgroundColor: 'rgb(249, 210, 229)' }}>
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-10 md:mb-16 px-2">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-serif font-bold text-black mb-3 md:mb-4">
             Our Collection
           </h2>
-          <p className="text-xl text-black/80 max-w-2xl mx-auto">
+          <p className="text-base md:text-xl text-black/80 max-w-2xl mx-auto">
             Explore our stunning range of lip gloss shades and formulas
           </p>
         </div>
 
         {itemsToShow < circleImages.length && (
-          <div className="relative">
+          <div className="relative mb-4">
             <button
               onClick={prev}
-              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 -ml-2 md:-ml-4 p-2 md:p-3 bg-white/80 hover:bg-white rounded-full shadow-lg transition-all duration-300 hover:scale-110"
+              className="absolute left-2 md:left-0 top-1/2 -translate-y-1/2 z-10 -ml-2 md:-ml-4 p-2 md:p-3 bg-white/80 hover:bg-white rounded-full shadow-lg transition-all duration-300 hover:scale-110"
+              aria-label="Previous products"
             >
-              <ChevronLeft size={20} className="text-gray-700 md:w-6 md:h-6" />
+              <ChevronLeft size={18} className="text-gray-700 md:w-6 md:h-6" />
             </button>
 
             <button
               onClick={next}
-              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 -mr-2 md:-mr-4 p-2 md:p-3 bg-white/80 hover:bg-white rounded-full shadow-lg transition-all duration-300 hover:scale-110"
+              className="absolute right-2 md:right-0 top-1/2 -translate-y-1/2 z-10 -mr-2 md:-mr-4 p-2 md:p-3 bg-white/80 hover:bg-white rounded-full shadow-lg transition-all duration-300 hover:scale-110"
+              aria-label="Next products"
             >
-              <ChevronRight size={20} className="text-gray-700 md:w-6 md:h-6" />
+              <ChevronRight size={18} className="text-gray-700 md:w-6 md:h-6" />
             </button>
           </div>
         )}
 
-        <div className="overflow-hidden px-8 md:px-0">
+        <div className="overflow-hidden px-6 md:px-0">
           <div 
-            className="flex transition-transform duration-500 ease-in-out gap-4 md:gap-8"
+            className="flex transition-transform duration-500 ease-in-out gap-3 md:gap-6 lg:gap-8"
             style={{ transform: itemsToShow < circleImages.length ? `translateX(-${currentIndex * itemWidth}%)` : 'translateX(0)' }}
           >
             {circleImages.map((item) => (
@@ -155,22 +159,22 @@ function CircleCarousel() {
                 className="flex-shrink-0"
                 style={{ width: `${itemWidth}%` }}
               >
-                <div className="text-center group px-2">
-                  <div className="relative w-24 h-24 md:w-32 md:h-32 mx-auto mb-4 rounded-full overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-500 transform group-hover:scale-110 border-4 border-white">
+                <div className="text-center group px-1 md:px-2">
+                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 mx-auto mb-3 md:mb-4 rounded-full overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-500 transform group-hover:scale-105 md:group-hover:scale-110 border-4 border-white">
                     <Image
                       src={item.src}
                       alt={item.alt}
                       fill
                       className="object-cover"
-                      sizes="(max-width: 640px) 96px, 128px"
+                      sizes="(max-width: 640px) 80px, (max-width: 768px) 96px, (max-width: 1024px) 112px, 128px"
                     />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 rounded-full" />
                   </div>
                   
-                  <h3 className="font-serif font-semibold text-black mb-2 text-base md:text-lg">
+                  <h3 className="font-serif font-semibold text-black mb-1 md:mb-2 text-sm md:text-base lg:text-lg line-clamp-1">
                     {item.name}
                   </h3>
-                  <p className="text-xs md:text-sm text-black/80 leading-tight">
+                  <p className="text-xs md:text-sm text-black/80 leading-tight line-clamp-2 px-1">
                     {item.desc}
                   </p>
                 </div>
@@ -180,7 +184,7 @@ function CircleCarousel() {
         </div>
 
         {itemsToShow < circleImages.length && (
-          <div className="flex justify-center gap-2 mt-8">
+          <div className="flex justify-center gap-2 mt-6 md:mt-8">
             {Array.from({ length: Math.max(1, circleImages.length - itemsToShow + 1) }).map((_, index) => (
               <button
                 key={index}
@@ -188,6 +192,7 @@ function CircleCarousel() {
                 className={`w-2 h-2 md:w-3 md:h-3 rounded-full transition-all duration-300 ${
                   index === currentIndex ? "bg-black scale-125" : "bg-white/50 hover:bg-white/70"
                 }`}
+                aria-label={`Go to slide ${index + 1}`}
               />
             ))}
           </div>
@@ -204,7 +209,7 @@ function HeroCarousel() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % heroImages.length)
-    }, 5000) // Change slide every 5 seconds
+    }, 5000)
 
     return () => clearInterval(interval)
   }, [])
@@ -218,7 +223,7 @@ function HeroCarousel() {
   }
 
   return (
-    <section className="relative h-screen">
+    <section className="relative h-[70vh] md:h-screen">
       <div className="absolute inset-0">
         {heroImages.map((image, index) => (
           <div
@@ -233,6 +238,7 @@ function HeroCarousel() {
               fill
               className="object-cover"
               priority={index === 0}
+              sizes="100vw"
             />
             <div className="absolute inset-0 bg-black/20" />
           </div>
@@ -242,58 +248,61 @@ function HeroCarousel() {
       {/* Navigation Buttons */}
       <button
         onClick={prevSlide}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/80 hover:bg-white rounded-full shadow-lg transition-all duration-300 hover:scale-110"
+        className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-10 p-2 md:p-3 bg-white/80 hover:bg-white rounded-full shadow-lg transition-all duration-300 hover:scale-110"
+        aria-label="Previous slide"
       >
-        <ChevronLeft size={24} className="text-gray-700" />
+        <ChevronLeft size={18} className="text-gray-700 md:w-6 md:h-6" />
       </button>
 
       <button
         onClick={nextSlide}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/80 hover:bg-white rounded-full shadow-lg transition-all duration-300 hover:scale-110"
+        className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-10 p-2 md:p-3 bg-white/80 hover:bg-white rounded-full shadow-lg transition-all duration-300 hover:scale-110"
+        aria-label="Next slide"
       >
-        <ChevronRight size={24} className="text-gray-700" />
+        <ChevronRight size={18} className="text-gray-700 md:w-6 md:h-6" />
       </button>
 
       {/* Dots Indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex gap-2">
+      <div className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-10 flex gap-2">
         {heroImages.map((_, index) => (
           <button
             key={index}
             onClick={() => setCurrentSlide(index)}
-            className={`w-3 h-3 rounded-full transition-all duration-300 ${
+            className={`w-2 h-2 md:w-3 md:h-3 rounded-full transition-all duration-300 ${
               index === currentSlide ? "bg-white scale-125" : "bg-white/50 hover:bg-white/70"
             }`}
+            aria-label={`Go to slide ${index + 1}`}
           />
         ))}
       </div>
 
       {/* Content */}
-      <div className="relative h-full flex items-center">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="relative h-full flex items-center px-4 md:px-0">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">
           <div className="flex justify-end">
-            <div className="max-w-md text-right">
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6">
+            <div className="max-w-full md:max-w-md text-center md:text-right">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white mb-4 md:mb-6">
                 <span className="font-[Segoe_Script]">Alora</span>
                 <br />
                 <span className="font-serif">Lipgloss</span>
               </h1>
               
-              <p className="text-xl text-white/90 mb-8 leading-relaxed font-light">
+              <p className="text-base md:text-xl text-white/90 mb-6 md:mb-8 leading-relaxed font-light px-2 md:px-0">
                 Discover our collection of luxury lip glosses crafted for the modern woman. 
                 Shine bright with Alora.
               </p>
               
-              <div className="flex gap-4 justify-end">
+              <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center md:justify-end">
                 <Link 
                   href="/shop"
-                  className="bg-gradient-to-r from-rose-400 to-pink-500 text-white px-8 py-4 rounded-full font-semibold hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                  className="bg-gradient-to-r from-rose-400 to-pink-500 text-white px-6 py-3 md:px-8 md:py-4 rounded-full font-semibold hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl text-sm md:text-base"
                 >
                   Shop Now
                 </Link>
                 
                 <Link 
                   href="/about"
-                  className="border-2 border-white text-white px-8 py-4 rounded-full font-semibold hover:bg-white hover:text-gray-900 transition-all duration-300 transform hover:scale-105 backdrop-blur-sm"
+                  className="border-2 border-white text-white px-6 py-3 md:px-8 md:py-4 rounded-full font-semibold hover:bg-white hover:text-gray-900 transition-all duration-300 transform hover:scale-105 backdrop-blur-sm text-sm md:text-base"
                 >
                   Learn More
                 </Link>
@@ -314,21 +323,18 @@ export default function Home() {
   const [realProducts, setRealProducts] = useState<any[]>([])
   const [productsLoading, setProductsLoading] = useState(true)
 
-  // Fetch real products from backend - USING YOUR API CLIENT
+  // Fetch real products from backend
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         console.log('Fetching products from API...')
         
-        // Use your API client instead of direct fetch
         const data = await api.get('/products')
         console.log('Products API response:', data)
         
         if (data.success && data.products && data.products.length > 0) {
           setRealProducts(data.products)
         } else {
-          // If no products, use the circleImages as fallback
-          console.log('No products from API, using fallback data')
           const fallbackProducts = circleImages.map(img => ({
             _id: img.id.toString(),
             name: img.name,
@@ -341,7 +347,6 @@ export default function Home() {
         }
       } catch (error) {
         console.error('Error fetching products:', error)
-        // Use fallback data on error
         const fallbackProducts = circleImages.map(img => ({
           _id: img.id.toString(),
           name: img.name,
@@ -359,7 +364,10 @@ export default function Home() {
     fetchProducts()
   }, [])
 
-  const handleAddToCart = (product: any) => {
+  const handleAddToCart = async (product: any, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
     if (!isAuthenticated) {
       router.push('/login')
       return
@@ -368,21 +376,35 @@ export default function Home() {
     setAddingProductId(product._id)
     
     try {
-      // Use the addToCart function from your CartContext
-      addToCart({
-        id: product._id || product.id,
+      const cartItem = {
+        productId: product._id || product.id,
         name: product.name,
         price: product.price,
         image: product.image || product.src,
         quantity: 1,
         description: product.description || product.desc,
         rating: product.rating
-      })
+      }
       
+      const existingCart = localStorage.getItem('alora-cart')
+      let cart = existingCart ? JSON.parse(existingCart) : []
+      
+      const existingIndex = cart.findIndex((item: any) => item.productId === cartItem.productId)
+      
+      if (existingIndex >= 0) {
+        cart[existingIndex].quantity += 1
+      } else {
+        cart.push(cartItem)
+      }
+      
+      localStorage.setItem('alora-cart', JSON.stringify(cart))
+      console.log('🛒 Cart updated:', cart)
       alert(`✅ ${product.name} added to cart!`)
+      window.dispatchEvent(new Event('storage'))
+      
     } catch (error: any) {
       console.error('Add to cart error:', error)
-      alert('Error: ' + error.message)
+      alert('Error: ' + (error.message || 'Failed to add to cart'))
     } finally {
       setAddingProductId(null)
     }
@@ -394,7 +416,7 @@ export default function Home() {
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
-            size={14}
+            size={12}
             className={star <= Math.floor(rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
           />
         ))}
@@ -404,79 +426,86 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'rgb(249, 210, 229)' }}>
+    <div className="min-h-screen overflow-hidden" style={{ backgroundColor: 'rgb(249, 210, 229)' }}>
       {/* Hero Carousel Section */}
       <HeroCarousel />
 
       {/* Circle Carousel Section */}
       <CircleCarousel />
 
-      {/* Product Grid Section */}
-      <section className="py-20" style={{ backgroundColor: 'rgb(249, 210, 229)' }}>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-start">
-            <div className="text-center lg:text-left flex flex-col justify-center h-full">
-              <div className="relative h-[500px] rounded-2xl overflow-hidden shadow-2xl group">
+      {/* Product Grid Section - UPDATED FOR 2 COLUMNS ON MOBILE */}
+      <section className="py-12 md:py-20 px-4 sm:px-6" style={{ backgroundColor: 'rgb(249, 210, 229)' }}>
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12 items-start">
+            {/* Left Image - Hidden on mobile, shown on desktop */}
+            <div className="text-center lg:text-left flex flex-col justify-center h-full order-2 lg:order-1">
+              <div className="relative h-[300px] sm:h-[400px] md:h-[500px] rounded-2xl overflow-hidden shadow-2xl group mb-6 lg:mb-0">
                 <Image
                   src="https://i.pinimg.com/1200x/ea/e4/e3/eae4e3a62290e3af48a09276968a6a76.jpg"
                   alt="Premium Lip Gloss Collection"
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-500"
+                  sizes="(max-width: 768px) 100vw, 50vw"
                 />
                 <div className="absolute inset-0 bg-black/10 group-hover:bg-black/5 transition-all duration-300" />
               </div>
             </div>
 
-            <div className="lg:col-span-2">
-              <h3 className="text-2xl md:text-3xl font-serif font-bold text-black mb-8 text-center lg:text-left">
-                Premium Lip Gloss Collection for Every Occasion
+            {/* Products Grid - Full width on mobile, 2/3 on desktop */}
+            <div className="lg:col-span-2 order-1 lg:order-2">
+              <h3 className="text-xl sm:text-2xl md:text-3xl font-serif font-bold text-black mb-6 md:mb-8 text-center lg:text-left">
+                Premium Lip Gloss Collection
               </h3>
               
               {productsLoading ? (
-                <div className="flex justify-center items-center h-40">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
-                  <span className="ml-3 text-gray-600">Loading products...</span>
+                <div className="flex flex-col items-center justify-center h-40">
+                  <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-pink-500"></div>
+                  <span className="mt-3 text-gray-600 text-sm md:text-base">Loading products...</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                   {realProducts.map((product, index) => (
-                    <div key={product._id || product.id} className="text-center group">
-                      <div className="relative h-48 rounded-lg overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 mb-3">
+                    <Link 
+                      key={product._id || product.id} 
+                      href={`/product-detail/${product._id || product.id}`}
+                      className="text-center group block"
+                    >
+                      <div className="relative h-32 sm:h-40 md:h-48 rounded-lg overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 mb-2 md:mb-3">
                         <Image
                           src={product.image || circleImages[index % circleImages.length]?.src}
                           alt={product.name}
                           fill
                           className="object-cover group-hover:scale-110 transition-transform duration-300"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          sizes="(max-width: 640px) 50vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw"
                         />
                       </div>
                       
-                      <div className="space-y-2 p-2">
-                        <h4 className="font-serif font-semibold text-black text-base">
+                      <div className="space-y-1 md:space-y-2 p-1 md:p-2">
+                        <h4 className="font-serif font-semibold text-black text-sm md:text-base group-hover:text-pink-600 transition-colors line-clamp-1">
                           {product.name}
                         </h4>
                         
-                        <p className="text-gray-600 text-sm line-clamp-2">
+                        <p className="text-gray-600 text-xs md:text-sm line-clamp-2">
                           {product.description}
                         </p>
                         
-                        <div className="flex items-center justify-between">
-                          <p className="text-lg font-bold text-black">
-                            ${product.price?.toFixed(2) || '24.99'}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+                          <p className="text-base md:text-lg font-bold text-black mb-1 sm:mb-0">
+                            ETB {product.price?.toFixed(2) || '24.99'}
                           </p>
                           <StarRating rating={product.rating || 4.5} />
                         </div>
                         
-                        <button
-                          onClick={() => handleAddToCart(product)}
+                        {/* <button
+                          onClick={(e) => handleAddToCart(product, e)}
                           disabled={addingProductId === product._id}
-                          className="w-full bg-gradient-to-r from-rose-400 to-pink-500 text-white py-2 px-4 rounded-full font-semibold hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full bg-gradient-to-r from-rose-400 to-pink-500 text-white py-1.5 md:py-2 px-3 md:px-4 rounded-full font-semibold hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <ShoppingBag size={16} />
+                          <ShoppingBag size={12} className="md:w-4 md:h-4" />
                           {addingProductId === product._id ? 'Adding...' : 'Add to Cart'}
-                        </button>
+                        </button> */}
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}
@@ -486,24 +515,35 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20" style={{ backgroundColor: 'rgb(249, 210, 229)' }}>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl md:text-5xl font-serif font-bold text-black mb-6">
+      <section className="py-12 md:py-20 relative px-4 sm:px-6">
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="https://i.pinimg.com/736x/7d/a6/d2/7da6d270db83b4a62296fc1389f5407b.jpg"
+            alt="Background"
+            fill
+            className="object-cover"
+            sizes="100vw"
+          />
+          <div className="absolute inset-0 bg-black/10"></div>
+        </div>
+        
+        <div className="max-w-7xl mx-auto text-center relative z-10">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-bold text-white mb-4 md:mb-6">
             Ready to Shine?
           </h2>
-          <p className="text-xl text-black/80 mb-8 max-w-2xl mx-auto">
+          <p className="text-base md:text-xl text-white/90 mb-6 md:mb-8 max-w-2xl mx-auto px-2">
             Discover your perfect shade and experience the Alora difference.
           </p>
-          <div className="flex gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center">
             <Link 
               href="/shop"
-              className="bg-gradient-to-r from-rose-400 to-pink-500 text-white px-8 py-4 rounded-full font-semibold hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+              className="bg-gradient-to-r from-rose-400 to-pink-500 text-white px-6 py-3 md:px-8 md:py-4 rounded-full font-semibold hover:from-rose-500 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl text-sm md:text-base"
             >
               Shop Collection
             </Link>
             <Link 
               href="/about"
-              className="border-2 border-black text-black px-8 py-4 rounded-full font-semibold hover:bg-black hover:text-white transition-all duration-300 transform hover:scale-105"
+              className="border-2 border-white text-white px-6 py-3 md:px-8 md:py-4 rounded-full font-semibold hover:bg-white hover:text-gray-900 transition-all duration-300 transform hover:scale-105 backdrop-blur-sm text-sm md:text-base"
             >
               Our Story
             </Link>
@@ -512,19 +552,19 @@ export default function Home() {
       </section>
 
       {/* YouTube Video Section */}
-      <section className="py-20" style={{ backgroundColor: 'rgb(249, 210, 229)' }}>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-serif font-bold text-black mb-4">
+      <section className="py-12 md:py-20 px-4 sm:px-6" style={{ backgroundColor: 'rgb(249, 210, 229)' }}>
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-8 md:mb-12">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-bold text-black mb-3 md:mb-4">
               Daily Beauty Vlog
             </h2>
-            <p className="text-xl text-black/80 max-w-2xl mx-auto">
+            <p className="text-base md:text-xl text-black/80 max-w-2xl mx-auto px-2">
               Watch our daily vlog to see our products in action and get beauty tips from our experts
             </p>
           </div>
           
           <div className="max-w-4xl mx-auto">
-            <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl">
+            <div className="relative aspect-video rounded-xl md:rounded-2xl overflow-hidden shadow-xl md:shadow-2xl">
               <iframe
                 width="100%"
                 height="100%"
