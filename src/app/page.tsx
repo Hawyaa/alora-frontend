@@ -12,7 +12,7 @@ import { api } from '@/lib/api'
 const circleImages = [
   {
     id: 1,
-    src: "https://i.pinimg.com/1200x/8d/0c/22/8d0c22b4522ae0cade6e495c0ebf6767.jpg",
+    src: "https://i.pinimg.com/736x/0d/65/c0/0d65c08aef63fdc641037dd030c9dd38.jpg",
     alt: "Pink Lip Gloss",
     name: "Crystal Pink",
     desc: "Shimmering pink gloss",
