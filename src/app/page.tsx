@@ -570,7 +570,7 @@ export default function Home() {
       <section className="py-12 md:py-20 relative px-4 sm:px-6">
         <div className="absolute inset-0 z-0">
           <Image
-            src="https://i.pinimg.com/736x/7d/a6/d2/7da6d270db83b4a62296fc1389f5407b.jpg"
+            src="https://i.pinimg.com/1200x/51/b3/5d/51b35d9d34be1fac53c5dcdddafd6c00.jpg"
             alt="Background"
             fill
             className="object-cover"
