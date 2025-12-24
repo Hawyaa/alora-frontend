@@ -78,15 +78,12 @@ export default function ProductDetailPage() {
     if (product) {
       addToCart({
         id: product.id,
+        productId: product.id, // Add this - it's required!
         name: product.name,
         price: product.price,
         image: product.images[0],
-        quantity: quantity,
-        description: product.description,
         category: product.category,
-        rating: product.rating,
-        reviews: product.reviews,
-        stock: product.stock
+        // No quantity here!
       })
       
       alert(`✅ ${quantity}x ${product.name} added to cart!`)

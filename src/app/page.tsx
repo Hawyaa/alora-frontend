@@ -70,12 +70,12 @@ const circleImages = [
 const heroImages = [
   {
     id: 1,
-    src: "https://i.pinimg.com/736x/cc/15/82/cc1582277c527faefb9d51f97e40b9af.jpg",
+    src: "https://i.pinimg.com/1200x/17/cf/6c/17cf6cd5bf8eb592b01391ade1e6faae.jpg",
     alt: "Luxurious Pink Lip Gloss"
   },
   {
     id: 2,
-    src: "https://i.pinimg.com/1200x/17/cf/6c/17cf6cd5bf8eb592b01391ade1e6faae.jpg",
+    src: "https://i.pinimg.com/736x/cc/15/82/cc1582277c527faefb9d51f97e40b9af.jpg",
     alt: "Elegant Lip Gloss Collection"
   }
 ]
@@ -323,8 +323,7 @@ export default function Home() {
   const [realProducts, setRealProducts] = useState<any[]>([])
   const [productsLoading, setProductsLoading] = useState(true)
 
-  // Fetch real products from backend
-  // Fetch homepage products from API
+ 
   // Fetch homepage products from API
   useEffect(() => {
     const fetchHomepageProducts = async () => {
@@ -336,7 +335,7 @@ export default function Home() {
         console.log('Homepage products API response:', data);
         
         if (data.success && data.products && data.products.length > 0) {
-          // The API returns products with nested productId structure
+          
           // We need to check the structure and extract the product data properly
           const formattedProducts = data.products.map((productData: any) => {
             // Check if the product data has a nested productId structure
@@ -356,7 +355,7 @@ export default function Home() {
                 rating: 4.5 // Default rating
               };
             } else {
-              // This is the structure from regular /homepage-products
+             
               // or it's already a product object
               return {
                 _id: productData._id,
@@ -480,89 +479,92 @@ export default function Home() {
       {/* Circle Carousel Section */}
       <CircleCarousel />
 
+      
       {/* Product Grid Section - UPDATED FOR 2 COLUMNS ON MOBILE */}
-      <section className="py-12 md:py-20 px-4 sm:px-6" style={{ backgroundColor: 'rgb(249, 210, 229)' }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12 items-start">
-            {/* Left Image - Hidden on mobile, shown on desktop */}
-            <div className="text-center lg:text-left flex flex-col justify-center h-full order-2 lg:order-1">
-              <div className="relative h-[300px] sm:h-[400px] md:h-[500px] rounded-2xl overflow-hidden shadow-2xl group mb-6 lg:mb-0">
-                <Image
-                  src="https://i.pinimg.com/1200x/ea/e4/e3/eae4e3a62290e3af48a09276968a6a76.jpg"
-                  alt="Premium Lip Gloss Collection"
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-500"
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                />
-                <div className="absolute inset-0 bg-black/10 group-hover:bg-black/5 transition-all duration-300" />
-              </div>
-            </div>
-
-            {/* Products Grid - Full width on mobile, 2/3 on desktop */}
-            <div className="lg:col-span-2 order-1 lg:order-2">
-              <h3 className="text-xl sm:text-2xl md:text-3xl font-serif font-bold text-black mb-6 md:mb-8 text-center lg:text-left">
-                Premium Lip Gloss Collection
-              </h3>
-              
-              {productsLoading ? (
-                <div className="flex flex-col items-center justify-center h-40">
-                  <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-pink-500"></div>
-                  <span className="mt-3 text-gray-600 text-sm md:text-base">Loading products...</span>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-  {realProducts.map((product, index) => {
-    // Convert USD price to ETB
-    const productPriceETB = product.price ? Math.round(product.price * 55) : 0;
-    
-    return (
-      <Link 
-        key={product._id || product.id} 
-        href={`/product-detail/${product._id || product.id}`}
-        className="text-center group block"
-      >
-        <div className="relative h-32 sm:h-40 md:h-48 rounded-lg overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 mb-2 md:mb-3">
+<section className="py-12 md:py-20 px-4 sm:px-6" style={{ backgroundColor: 'rgb(249, 210, 229)' }}>
+  <div className="max-w-7xl mx-auto">
+  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12 items-start">
+      {/* Left Image - Hidden on mobile, shown on desktop */}
+      <div className="hidden lg:block text-center lg:text-left flex flex-col justify-center h-full order-2 lg:order-1 lg:pt-20">
+        <div className="relative h-[300px] sm:h-[400px] md:h-[500px] rounded-2xl overflow-hidden shadow-2xl group mb-6 lg:mb-0">
           <Image
-            src={product.images?.[0] || product.image || circleImages[index % circleImages.length]?.src}
-            alt={product.name}
+            src="https://i.pinimg.com/1200x/ea/e4/e3/eae4e3a62290e3af48a09276968a6a76.jpg"
+            alt="Premium Lip Gloss Collection"
             fill
-            className="object-cover group-hover:scale-110 transition-transform duration-300"
-            sizes="(max-width: 640px) 50vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw"
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            sizes="(max-width: 768px) 100vw, 50vw"
           />
+          <div className="absolute inset-0 bg-black/10 group-hover:bg-black/5 transition-all duration-300" />
         </div>
+      </div>
+
+      {/* Products Grid - Full width on mobile, 2/3 on desktop */}
+      <div className="lg:col-span-2 order-1 lg:order-2">
+        <h3 className="text-xl sm:text-2xl md:text-3xl font-serif font-bold text-black mb-6 md:mb-8 text-center lg:text-left">
+          Premium Lip Gloss Collection
+        </h3>
         
-        <div className="space-y-1 md:space-y-2 p-1 md:p-2">
-          <h4 className="font-serif font-semibold text-black text-sm md:text-base group-hover:text-pink-600 transition-colors line-clamp-1">
-            {product.name}
-          </h4>
-          
-          <p className="text-gray-600 text-xs md:text-sm line-clamp-2">
-            {product.description}
-          </p>
-          
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between">
-            <p className="text-base md:text-lg font-bold text-black mb-1 sm:mb-0">
-              ETB {productPriceETB.toFixed(2)}
-            </p>
-            <StarRating rating={product.rating || 4.5} />
+        {productsLoading ? (
+          <div className="flex flex-col items-center justify-center h-40">
+            <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-pink-500"></div>
+            <span className="mt-3 text-gray-600 text-sm md:text-base">Loading products...</span>
           </div>
-          
-          {/* Optional: Show stock status */}
-          {product.inStock !== undefined && (
-            <div className="text-xs text-gray-500">
-              {product.inStock ? 'In Stock' : 'Out of Stock'}
-            </div>
-          )}
-        </div>
-      </Link>
-    );
-  })}
-</div>
-              )}
-            </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            {realProducts.map((product, index) => {
+              // Convert USD price to ETB
+              const productPriceETB = product.price ? Math.round(product.price * 55) : 0;
+              
+              return (
+                <Link 
+                  key={product._id || product.id} 
+                  href={`/product-detail/${product._id || product.id}`}
+                  className="text-center group block"
+                >
+                  <div className="relative h-32 sm:h-40 md:h-48 rounded-lg overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 mb-2 md:mb-3">
+                    <Image
+                      src={product.images?.[0] || product.image || circleImages[index % circleImages.length]?.src}
+                      alt={product.name}
+                      fill
+                      className="object-cover group-hover:scale-110 transition-transform duration-300"
+                      sizes="(max-width: 640px) 50vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1 md:space-y-2 p-1 md:p-2">
+                    <h4 className="font-serif font-semibold text-black text-sm md:text-base group-hover:text-pink-600 transition-colors line-clamp-1">
+                      {product.name}
+                    </h4>
+                    
+                    <p className="text-gray-600 text-xs md:text-sm line-clamp-2">
+                      {product.description}
+                    </p>
+                    {/* <div className="space-y-1 md:space-y-2 p-1 md:p-2">
+                      <StarRating rating={product.rating || 4.5} />
+                    </div> */}
+                    <div className="space-y-1 md:space-y-2 p-1 md:p-2">
+                      <p className="font-serif font-semibold text-black text-sm md:text-base group-hover:text-pink-600 transition-colors line-clamp-1">
+                        ETB {productPriceETB.toFixed(2)}
+                      </p>
+                      
+                    </div>
+                    
+                    {/* Optional: Show stock status */}
+                    {product.inStock !== undefined && (
+                      <div className="text-xs text-gray-500">
+                        {product.inStock ? 'In Stock' : 'Out of Stock'}
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
-        </div>
-      </section>
+        )}
+      </div>
+    </div>
+  </div>
+</section>
 
       {/* CTA Section */}
       <section className="py-12 md:py-20 relative px-4 sm:px-6">
