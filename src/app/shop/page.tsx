@@ -8,7 +8,7 @@ import { ShoppingBag, Star, ChevronDown, LogIn, Package, Filter, Grid, List, Che
 import { useCart } from "@/contexts/CartContext"
 import { useAuth } from "@/contexts/AuthContext"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://alora-backend.onrender.com'
 
 // Define Product Type
 interface Product {
