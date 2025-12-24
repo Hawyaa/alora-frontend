@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { CheckCircle, Package, Home, ShoppingBag, Clock, Truck, Shield, CreditCard } from 'lucide-react'
+import { CheckCircle, Package, ShoppingBag, Clock, Truck, Shield, CreditCard } from 'lucide-react'
 import Link from 'next/link'
 
 interface OrderDetails {
@@ -31,8 +31,8 @@ interface OrderDetails {
     phone: string;
   };
 }
-export const dynamic = 'force-dynamic'
-export default function OrderConfirmationPage() {
+
+function OrderConfirmationContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [order, setOrder] = useState<OrderDetails | null>(null)
@@ -47,10 +47,14 @@ export default function OrderConfirmationPage() {
     }
 
     // Clear cart
-    localStorage.removeItem('alora-cart')
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('alora-cart')
+    }
 
     // Load order data from localStorage (from checkout)
     const loadOrderFromLocalStorage = () => {
+      if (typeof window === 'undefined') return false
+      
       console.log('🔍 Loading order from localStorage...')
       
       // Try to get from last-order
@@ -99,12 +103,13 @@ export default function OrderConfirmationPage() {
 
     // Try to fetch from backend if token exists
     const fetchOrderFromBackend = async () => {
-      const token = localStorage.getItem('alora-token')
+      const token = typeof window !== 'undefined' ? localStorage.getItem('alora-token') : null
       
       if (token && orderId && !orderId.startsWith('local-') && !orderId.startsWith('error-')) {
         try {
           console.log('🔍 Fetching order from backend:', orderId)
-          const response = await fetch(`http://localhost:5000/api/orders/${orderId}`, {
+          const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+          const response = await fetch(`${API_URL}/api/orders/${orderId}`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -170,9 +175,17 @@ export default function OrderConfirmationPage() {
     fetchOrderFromBackend()
   }, [orderId, router])
 
-  // ... rest of your component remains the same until the return statement ...
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-rose-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your order...</p>
+        </div>
+      </div>
+    )
+  }
 
-  // In your JSX, update the customer info display:
   return (
     <div className="min-h-screen bg-gradient-to-b from-rose-50 to-white">
       {/* Success Header */}
@@ -432,5 +445,22 @@ export default function OrderConfirmationPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export const dynamic = 'force-dynamic'
+
+export default function OrderConfirmationPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-rose-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading order confirmation...</p>
+        </div>
+      </div>
+    }>
+      <OrderConfirmationContent />
+    </Suspense>
   )
 }
