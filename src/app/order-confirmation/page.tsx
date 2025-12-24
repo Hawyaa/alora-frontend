@@ -31,7 +31,7 @@ interface OrderDetails {
     phone: string;
   };
 }
-
+export const dynamic = 'force-dynamic'
 export default function OrderConfirmationPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
