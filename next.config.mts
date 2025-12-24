@@ -1,14 +1,24 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ['i.pinimg.com'],
-    unoptimized: process.env.NODE_ENV === 'development',
-  },
-  experimental: {
-    turbo: {
-      rules: {}
-    }
+    domains: [
+      'i.pinimg.com',
+      'alora-backend.onrender.com',
+      'localhost'
+    ],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'i.pinimg.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'alora-backend.onrender.com',
+        pathname: '/**',
+      }
+    ]
   }
 }
 
-module.exports = nextConfig
+export default nextConfig
