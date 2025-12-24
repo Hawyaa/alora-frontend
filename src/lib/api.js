@@ -1,5 +1,5 @@
 // Use your existing API_URL from env or hardcode fallback
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://alora-backend.onrender.com/api'
 
 // Log for debugging
 console.log('📡 API Client initialized with URL:', API_URL)
