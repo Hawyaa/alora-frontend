@@ -24,7 +24,8 @@ interface AuthContextType {
   refreshAuth: () => void
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+// const AuthContext = createContext<AuthContextType | undefined>(undefined)
+export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
