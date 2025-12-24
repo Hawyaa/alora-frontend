@@ -26,9 +26,9 @@ export default function TestPaymentPage() {
         }
       )
 
-      if (result.success && result.data?.checkout_url) {
+      if (result.success && result.checkout_url) { // ✅ Fixed line
         // Redirect to Chapa
-        window.location.href = result.data.checkout_url
+        window.location.href = result.checkout_url // ✅ Fixed line
       } else {
         alert('Payment failed: ' + (result.error || 'Unknown error'))
       }
