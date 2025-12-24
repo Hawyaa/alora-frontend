@@ -38,7 +38,7 @@ export function ProductProvider({ children }: ProductProviderProps) {
     setIsLoading(true)
     setError(null)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://alora-backend.onrender.com/api'
       const response = await fetch(`${apiUrl}/products`)
       
       if (!response.ok) {
