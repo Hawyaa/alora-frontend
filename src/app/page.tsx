@@ -70,7 +70,7 @@ const circleImages = [
 const heroImages = [
   {
     id: 1,
-    src: "https://i.pinimg.com/736x/54/cb/1c/54cb1c5b2e8814c06f31fad242df2c5a.jpg",
+    src: "https://i.pinimg.com/1200x/99/2a/8e/992a8ecc1feadf01fd871fbbb10bdd46.jpg",
     alt: "Luxurious Pink Lip Gloss"
   },
   {
